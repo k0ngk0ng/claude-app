@@ -267,7 +267,7 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
     }
 
     const trimmed = value.trim();
-    if ((!trimmed && attachments.length === 0) || isStreaming) return;
+    if (!trimmed && attachments.length === 0) return;
 
     // Build message with attachment references
     let message = trimmed;
@@ -402,11 +402,9 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             placeholder="Ask Claude anything, @ to add files, / for commands"
-            disabled={isStreaming}
             rows={2}
             className="flex-1 bg-transparent text-sm text-text-primary placeholder-text-muted
-                       px-3 py-2.5 resize-none outline-none min-h-[64px] max-h-[300px]
-                       disabled:opacity-50"
+                       px-3 py-2.5 resize-none outline-none min-h-[64px] max-h-[300px]"
           />
 
           {/* Toolbar row — below textarea */}
@@ -414,10 +412,9 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
             {/* Add file button */}
             <button
               onClick={handleAddFile}
-              disabled={isStreaming}
               className="flex items-center justify-center w-8 h-8 rounded-lg
                          text-text-muted hover:text-text-primary hover:bg-surface-hover
-                         disabled:opacity-30 transition-colors"
+                         transition-colors"
               title="Add image"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -437,10 +434,9 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
             <div className="relative" ref={modeDropdownRef}>
               <button
                 onClick={() => setModeOpen(!modeOpen)}
-                disabled={isStreaming}
                 className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-xs
                            text-text-secondary hover:text-text-primary hover:bg-surface-hover
-                           disabled:opacity-30 transition-colors"
+                           transition-colors"
                 title={currentMode.description}
               >
                 {mode === 'ask' && (
@@ -516,8 +512,8 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
             {/* Divider */}
             <div className="w-px h-5 bg-border mx-0.5" />
 
-            {/* Send / Stop button */}
-            {isStreaming ? (
+            {/* Stop button (shown during streaming) */}
+            {isStreaming && (
               <button
                 onClick={onStop}
                 className="flex items-center justify-center w-8 h-8 rounded-lg
@@ -528,27 +524,28 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
                   <rect x="3" y="3" width="8" height="8" rx="1" fill="currentColor" />
                 </svg>
               </button>
-            ) : (
-              <button
-                onClick={handleSubmit}
-                disabled={!value.trim() && attachments.length === 0}
-                className="flex items-center justify-center w-8 h-8 rounded-lg
-                           bg-accent text-white hover:bg-accent-hover
-                           disabled:opacity-30 disabled:cursor-not-allowed
-                           transition-colors"
-                title="Send message (Enter)"
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path
-                    d="M7 12V2M7 2l-4 4M7 2l4 4"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
             )}
+
+            {/* Send button (always available) */}
+            <button
+              onClick={handleSubmit}
+              disabled={!value.trim() && attachments.length === 0}
+              className="flex items-center justify-center w-8 h-8 rounded-lg
+                         bg-accent text-white hover:bg-accent-hover
+                         disabled:opacity-30 disabled:cursor-not-allowed
+                         transition-colors"
+              title="Send message (Enter)"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path
+                  d="M7 12V2M7 2l-4 4M7 2l4 4"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
           </div>
         </div>
 

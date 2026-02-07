@@ -8,6 +8,14 @@ import type {
   CurrentSession,
 } from '../types';
 
+export interface ToolActivity {
+  id: string;
+  name: string;
+  input?: string; // brief description of input
+  status: 'running' | 'done';
+  timestamp: number;
+}
+
 interface AppStore {
   // Current session state
   currentSession: CurrentSession;
@@ -20,6 +28,7 @@ interface AppStore {
     branch: string;
   };
   streamingContent: string;
+  toolActivities: ToolActivity[];
   gitStatus: GitStatus | null;
   platform: 'mac' | 'windows' | 'linux';
 
@@ -47,6 +56,11 @@ interface AppStore {
   setStreamingContent: (content: string) => void;
   appendStreamingContent: (content: string) => void;
   clearStreamingContent: () => void;
+
+  // Tool activities
+  addToolActivity: (activity: ToolActivity) => void;
+  updateToolActivity: (id: string, status: 'done') => void;
+  clearToolActivities: () => void;
 
   // Git
   setGitStatus: (status: GitStatus | null) => void;
@@ -82,6 +96,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     branch: '',
   },
   streamingContent: '',
+  toolActivities: [],
   gitStatus: null,
   platform: 'mac',
 
@@ -95,6 +110,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set({
       currentSession: { ...defaultSession },
       streamingContent: '',
+      toolActivities: [],
     }),
 
   addMessage: (message) =>
@@ -168,6 +184,19 @@ export const useAppStore = create<AppStore>((set, get) => ({
       streamingContent: state.streamingContent + content,
     })),
   clearStreamingContent: () => set({ streamingContent: '' }),
+
+  // Tool activities
+  addToolActivity: (activity) =>
+    set((state) => ({
+      toolActivities: [...state.toolActivities, activity],
+    })),
+  updateToolActivity: (id, status) =>
+    set((state) => ({
+      toolActivities: state.toolActivities.map((a) =>
+        a.id === id ? { ...a, status } : a
+      ),
+    })),
+  clearToolActivities: () => set({ toolActivities: [] }),
 
   // Git
   setGitStatus: (status) => set({ gitStatus: status }),

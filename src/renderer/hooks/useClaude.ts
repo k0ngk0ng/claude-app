@@ -5,17 +5,13 @@ import type { ContentBlock, Message } from '../types';
 /**
  * Claude CLI stream-json protocol events:
  *
- * 1. {"type":"system","subtype":"init","session_id":"...","tools":[...],...}
- * 2. {"type":"stream_event","event":{"type":"message_start","message":{...}}}
- * 3. {"type":"stream_event","event":{"type":"content_block_start","content_block":{"type":"text",...}}}
- * 4. {"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"..."}}}
- *    (repeated for each token)
- * 5. {"type":"assistant","message":{"content":[{"text":"full text","type":"text"}],...}}
- *    (complete assistant message snapshot — sent with --include-partial-messages)
- * 6. {"type":"stream_event","event":{"type":"content_block_stop"}}
- * 7. {"type":"stream_event","event":{"type":"message_delta","delta":{"stop_reason":"end_turn",...}}}
- * 8. {"type":"stream_event","event":{"type":"message_stop"}}
- * 9. {"type":"result","subtype":"success","result":"full text","total_cost_usd":...,"session_id":"..."}
+ * Text response:
+ *   stream_event/message_start → content_block_start(text) → content_block_delta(text_delta) → assistant → result
+ *
+ * Tool use:
+ *   stream_event/message_start → content_block_start(tool_use, name) → content_block_delta(input_json_delta)
+ *   → assistant(tool_use blocks) → content_block_stop → message_delta(stop_reason:tool_use) → message_stop
+ *   → user(tool_result) → [new message_start for next turn]
  */
 
 interface StreamEvent {
@@ -37,6 +33,7 @@ interface StreamEvent {
       text?: string;
       name?: string;
       id?: string;
+      input?: Record<string, unknown>;
     };
     delta?: {
       type?: string;
@@ -51,6 +48,10 @@ interface StreamEvent {
     content: string | ContentBlock[];
     model?: string;
     stop_reason?: string | null;
+  };
+  tool_use_result?: {
+    type?: string;
+    file?: { filePath?: string };
   };
   result?: string;
   total_cost_usd?: number;
@@ -78,20 +79,21 @@ export function useClaude() {
   const processIdRef = useRef<string | null>(null);
   const streamingTextRef = useRef('');
   const currentModelRef = useRef<string | undefined>(undefined);
-  // Guard against duplicate result processing
   const lastResultIdRef = useRef<string | null>(null);
+  // Track current tool use block
+  const currentToolIdRef = useRef<string | null>(null);
+  const toolInputJsonRef = useRef('');
 
-  // Use a single stable handler registered ONCE — reads store actions via getState()
   useEffect(() => {
     const handler = (processId: string, raw: unknown) => {
       if (processId !== processIdRef.current) return;
 
       const event = raw as StreamEvent;
 
-      // Debug: log all events
       if (event.type !== 'stream_event') {
         console.log('[claude]', event.type, event.subtype || '', event);
       }
+
       const {
         addMessage,
         setIsStreaming,
@@ -99,6 +101,9 @@ export function useClaude() {
         setStreamingContent,
         clearStreamingContent,
         setCurrentSession,
+        addToolActivity,
+        updateToolActivity,
+        clearToolActivities,
       } = useAppStore.getState();
 
       switch (event.type) {
@@ -117,6 +122,25 @@ export function useClaude() {
             case 'message_start': {
               streamingTextRef.current = '';
               currentModelRef.current = evt.message?.model;
+              currentToolIdRef.current = null;
+              toolInputJsonRef.current = '';
+              break;
+            }
+
+            case 'content_block_start': {
+              if (evt.content_block?.type === 'tool_use') {
+                // Tool use starting — track it
+                const toolId = evt.content_block.id || `tool-${Date.now()}`;
+                const toolName = evt.content_block.name || 'Unknown';
+                currentToolIdRef.current = toolId;
+                toolInputJsonRef.current = '';
+                addToolActivity({
+                  id: toolId,
+                  name: toolName,
+                  status: 'running',
+                  timestamp: Date.now(),
+                });
+              }
               break;
             }
 
@@ -124,13 +148,55 @@ export function useClaude() {
               if (evt.delta?.type === 'text_delta' && evt.delta.text) {
                 streamingTextRef.current += evt.delta.text;
                 setStreamingContent(streamingTextRef.current);
+              } else if (evt.delta?.type === 'input_json_delta' && evt.delta.partial_json) {
+                // Accumulate tool input JSON for display
+                toolInputJsonRef.current += evt.delta.partial_json;
+                // Try to extract a brief description from the partial JSON
+                if (currentToolIdRef.current) {
+                  try {
+                    const partial = toolInputJsonRef.current;
+                    // Extract file_path, command, or pattern for display
+                    const fileMatch = partial.match(/"file_path"\s*:\s*"([^"]+)"/);
+                    const cmdMatch = partial.match(/"command"\s*:\s*"([^"]+)"/);
+                    const patternMatch = partial.match(/"pattern"\s*:\s*"([^"]+)"/);
+                    const input = fileMatch?.[1] || cmdMatch?.[1] || patternMatch?.[1];
+                    if (input) {
+                      const { toolActivities } = useAppStore.getState();
+                      const activity = toolActivities.find(a => a.id === currentToolIdRef.current);
+                      if (activity && !activity.input) {
+                        // Update with brief input description
+                        const brief = input.length > 60 ? '…' + input.slice(-57) : input;
+                        useAppStore.setState({
+                          toolActivities: toolActivities.map(a =>
+                            a.id === currentToolIdRef.current ? { ...a, input: brief } : a
+                          ),
+                        });
+                      }
+                    }
+                  } catch {
+                    // Ignore parse errors on partial JSON
+                  }
+                }
               }
               break;
             }
 
-            case 'content_block_start':
-            case 'content_block_stop':
-            case 'message_delta':
+            case 'content_block_stop': {
+              // If this was a tool use block, mark it as done
+              if (currentToolIdRef.current) {
+                updateToolActivity(currentToolIdRef.current, 'done');
+                currentToolIdRef.current = null;
+                toolInputJsonRef.current = '';
+              }
+              break;
+            }
+
+            case 'message_delta': {
+              // stop_reason: "tool_use" means Claude is waiting for tool results
+              // stop_reason: "end_turn" means Claude is done
+              break;
+            }
+
             case 'message_stop':
               break;
 
@@ -141,6 +207,7 @@ export function useClaude() {
         }
 
         case 'assistant': {
+          // Complete assistant message snapshot
           const text = extractTextFromContent(event.message?.content);
           if (text) {
             streamingTextRef.current = text;
@@ -149,8 +216,14 @@ export function useClaude() {
           break;
         }
 
+        case 'user': {
+          // Tool result — Claude CLI executed a tool and got results
+          // This means a new turn is about to start
+          // The tool activities are already marked done from content_block_stop
+          break;
+        }
+
         case 'result': {
-          // Dedup guard — prevent processing the same result twice
           const resultId = (raw as any).uuid || event.session_id || processId;
           if (resultId === lastResultIdRef.current) {
             console.log('[claude] duplicate result ignored', resultId);
@@ -160,6 +233,7 @@ export function useClaude() {
 
           setIsStreaming(false);
           clearStreamingContent();
+          clearToolActivities();
 
           const resultText = typeof event.result === 'string'
             ? event.result
@@ -190,6 +264,7 @@ export function useClaude() {
         case 'error': {
           setIsStreaming(false);
           clearStreamingContent();
+          clearToolActivities();
 
           const errorText =
             typeof event.message?.content === 'string'
@@ -207,6 +282,7 @@ export function useClaude() {
         case 'exit': {
           setIsStreaming(false);
           clearStreamingContent();
+          clearToolActivities();
           setProcessId(null);
           processIdRef.current = null;
           streamingTextRef.current = '';
@@ -228,7 +304,7 @@ export function useClaude() {
     return () => {
       window.api.claude.removeMessageListener(handler);
     };
-  }, []); // Empty deps — handler is stable, reads from refs and getState()
+  }, []);
 
   const startSession = useCallback(
     async (cwd: string, sessionId?: string) => {
@@ -250,11 +326,12 @@ export function useClaude() {
   );
 
   const sendMessage = useCallback(async (content: string) => {
+    const { addMessage, setIsStreaming, clearStreamingContent, clearToolActivities } =
+      useAppStore.getState();
+
+    // If no process, need to spawn one first
     const pid = processIdRef.current;
     if (!pid) return;
-
-    const { addMessage, setIsStreaming, clearStreamingContent } =
-      useAppStore.getState();
 
     addMessage({
       id: crypto.randomUUID(),
@@ -264,6 +341,7 @@ export function useClaude() {
     });
     setIsStreaming(true);
     clearStreamingContent();
+    clearToolActivities();
     streamingTextRef.current = '';
 
     await window.api.claude.send(pid, content);
@@ -273,11 +351,12 @@ export function useClaude() {
     if (processIdRef.current) {
       await window.api.claude.kill(processIdRef.current);
       processIdRef.current = null;
-      const { setProcessId, setIsStreaming, clearStreamingContent } =
+      const { setProcessId, setIsStreaming, clearStreamingContent, clearToolActivities } =
         useAppStore.getState();
       setProcessId(null);
       setIsStreaming(false);
       clearStreamingContent();
+      clearToolActivities();
       streamingTextRef.current = '';
     }
   }, []);
