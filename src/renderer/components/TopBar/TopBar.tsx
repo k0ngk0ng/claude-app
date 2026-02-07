@@ -1,11 +1,7 @@
 import React from 'react';
 import { useAppStore } from '../../stores/appStore';
 
-interface TopBarProps {
-  onNewThread: () => void;
-}
-
-export function TopBar({ onNewThread }: TopBarProps) {
+export function TopBar() {
   const { currentSession, currentProject, panels, togglePanel, platform } =
     useAppStore();
 
@@ -106,7 +102,7 @@ export function TopBar({ onNewThread }: TopBarProps) {
           </svg>
         </button>
 
-        {/* Diff toggle */}
+        {/* Diff toggle — Git compare / source control icon */}
         <button
           onClick={() => togglePanel('diff')}
           className={`p-1.5 rounded-md transition-colors ${
@@ -117,33 +113,14 @@ export function TopBar({ onNewThread }: TopBarProps) {
           title="Toggle changes (⌘D)"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            {/* Git branch/merge style icon — two nodes connected by paths */}
+            <circle cx="4.5" cy="4" r="1.5" stroke="currentColor" strokeWidth="1.2" />
+            <circle cx="11.5" cy="4" r="1.5" stroke="currentColor" strokeWidth="1.2" />
+            <circle cx="4.5" cy="12" r="1.5" stroke="currentColor" strokeWidth="1.2" />
             <path
-              d="M4 3v10M12 3v10"
+              d="M4.5 5.5v5M11.5 5.5C11.5 8.5 4.5 7 4.5 10"
               stroke="currentColor"
               strokeWidth="1.2"
-              strokeLinecap="round"
-            />
-            <path
-              d="M6 5h4M6 8h4M6 11h4"
-              stroke="currentColor"
-              strokeWidth="1.2"
-              strokeLinecap="round"
-            />
-          </svg>
-        </button>
-
-        {/* New thread */}
-        <button
-          onClick={onNewThread}
-          className="p-1.5 rounded-md text-text-secondary hover:text-text-primary
-                     hover:bg-surface-hover transition-colors"
-          title="New thread (⌘N)"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path
-              d="M8 3v10M3 8h10"
-              stroke="currentColor"
-              strokeWidth="1.5"
               strokeLinecap="round"
             />
           </svg>

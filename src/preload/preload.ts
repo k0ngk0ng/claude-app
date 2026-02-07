@@ -30,6 +30,7 @@ export interface GitAPI {
   listBranches: (cwd: string) => Promise<{ name: string; current: boolean }[]>;
   checkout: (cwd: string, branch: string) => Promise<string>;
   createBranch: (cwd: string, branch: string) => Promise<string>;
+  searchFiles: (cwd: string, query: string) => Promise<{ name: string; path: string }[]>;
 }
 
 export interface TerminalAPI {
@@ -115,6 +116,7 @@ contextBridge.exposeInMainWorld('api', {
     listBranches: (cwd: string) => ipcRenderer.invoke('git:listBranches', cwd),
     checkout: (cwd: string, branch: string) => ipcRenderer.invoke('git:checkout', cwd, branch),
     createBranch: (cwd: string, branch: string) => ipcRenderer.invoke('git:createBranch', cwd, branch),
+    searchFiles: (cwd: string, query: string) => ipcRenderer.invoke('git:searchFiles', cwd, query),
   } satisfies GitAPI,
 
   terminal: {

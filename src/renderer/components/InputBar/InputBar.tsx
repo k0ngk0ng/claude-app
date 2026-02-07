@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAppStore } from '../../stores/appStore';
+import { FileSearchPopup } from './FileSearchPopup';
 
 interface Attachment {
   name: string;
@@ -34,6 +35,11 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
   const [branches, setBranches] = useState<{ name: string; current: boolean }[]>([]);
   const [newBranchName, setNewBranchName] = useState('');
   const [showNewBranch, setShowNewBranch] = useState(false);
+  // @ file search state
+  const [fileSearchVisible, setFileSearchVisible] = useState(false);
+  const [fileSearchQuery, setFileSearchQuery] = useState('');
+  const [atTriggerIndex, setAtTriggerIndex] = useState(-1);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modeDropdownRef = useRef<HTMLDivElement>(null);
@@ -100,13 +106,80 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
     }
   }, [showNewBranch]);
 
-  // Load branches when dropdown opens
+  // Detect @ trigger in textarea
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value;
+    const cursorPos = e.target.selectionStart || 0;
+    setValue(newValue);
+
+    // Check if we just typed @ or are continuing to type after @
+    if (fileSearchVisible) {
+      // Already in search mode — update query
+      if (atTriggerIndex >= 0 && cursorPos > atTriggerIndex) {
+        const query = newValue.slice(atTriggerIndex + 1, cursorPos);
+        // Close if user typed a space right after @ with no query, or deleted the @
+        if (cursorPos <= atTriggerIndex || newValue[atTriggerIndex] !== '@') {
+          setFileSearchVisible(false);
+          setAtTriggerIndex(-1);
+          setFileSearchQuery('');
+        } else {
+          setFileSearchQuery(query);
+        }
+      } else {
+        setFileSearchVisible(false);
+        setAtTriggerIndex(-1);
+        setFileSearchQuery('');
+      }
+    } else {
+      // Check if @ was just typed
+      const charBefore = cursorPos >= 2 ? newValue[cursorPos - 2] : '';
+      const charAtCursor = newValue[cursorPos - 1];
+      if (charAtCursor === '@' && (charBefore === '' || charBefore === ' ' || charBefore === '\n' || cursorPos === 1)) {
+        setFileSearchVisible(true);
+        setAtTriggerIndex(cursorPos - 1);
+        setFileSearchQuery('');
+      }
+    }
+  }, [fileSearchVisible, atTriggerIndex]);
+
+  // Handle file selection from @ search
+  const handleFileSelect = useCallback((filePath: string) => {
+    if (atTriggerIndex >= 0) {
+      const cursorPos = textareaRef.current?.selectionStart || value.length;
+      // Replace @query with @filepath
+      const before = value.slice(0, atTriggerIndex);
+      const after = value.slice(cursorPos);
+      const newValue = before + '@' + filePath + ' ' + after;
+      setValue(newValue);
+
+      // Move cursor after the inserted path
+      const newCursorPos = atTriggerIndex + 1 + filePath.length + 1;
+      setTimeout(() => {
+        textareaRef.current?.setSelectionRange(newCursorPos, newCursorPos);
+        textareaRef.current?.focus();
+      }, 0);
+    }
+    setFileSearchVisible(false);
+    setAtTriggerIndex(-1);
+    setFileSearchQuery('');
+  }, [atTriggerIndex, value]);
+
+  const handleFileSearchClose = useCallback(() => {
+    setFileSearchVisible(false);
+    setAtTriggerIndex(-1);
+    setFileSearchQuery('');
+    textareaRef.current?.focus();
+  }, []);
+
+  // Load branches when dropdown opens — use currentProject.path with fallback
   const loadBranches = useCallback(async () => {
-    if (!currentProject.path) return;
+    const projectPath = currentProject.path || useAppStore.getState().currentSession.projectPath;
+    if (!projectPath) return;
     try {
-      const list = await window.api.git.listBranches(currentProject.path);
+      const list = await window.api.git.listBranches(projectPath);
       setBranches(list);
-    } catch {
+    } catch (err) {
+      console.error('Failed to list branches:', err);
       setBranches([]);
     }
   }, [currentProject.path]);
@@ -122,9 +195,10 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
   }, [branchOpen, loadBranches]);
 
   const handleCheckout = useCallback(async (branchName: string) => {
-    if (!currentProject.path) return;
+    const projectPath = currentProject.path || useAppStore.getState().currentSession.projectPath;
+    if (!projectPath) return;
     try {
-      await window.api.git.checkout(currentProject.path, branchName);
+      await window.api.git.checkout(projectPath, branchName);
       setBranch(branchName);
       setBranchOpen(false);
     } catch (err) {
@@ -134,9 +208,10 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
 
   const handleCreateBranch = useCallback(async () => {
     const name = newBranchName.trim();
-    if (!name || !currentProject.path) return;
+    const projectPath = currentProject.path || useAppStore.getState().currentSession.projectPath;
+    if (!name || !projectPath) return;
     try {
-      await window.api.git.createBranch(currentProject.path, name);
+      await window.api.git.createBranch(projectPath, name);
       setBranch(name);
       setBranchOpen(false);
       setShowNewBranch(false);
@@ -147,6 +222,13 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
   }, [newBranchName, currentProject.path, setBranch]);
 
   const handleSubmit = useCallback(() => {
+    // Close file search if open
+    if (fileSearchVisible) {
+      setFileSearchVisible(false);
+      setAtTriggerIndex(-1);
+      setFileSearchQuery('');
+    }
+
     const trimmed = value.trim();
     if ((!trimmed && attachments.length === 0) || isStreaming) return;
 
@@ -165,16 +247,22 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [value, attachments, isStreaming, onSend]);
+  }, [value, attachments, isStreaming, onSend, fileSearchVisible]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      // Don't handle Enter/Escape when file search is open — let FileSearchPopup handle it
+      if (fileSearchVisible) {
+        if (e.key === 'Enter' || e.key === 'Escape' || e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Tab') {
+          return; // Let the popup's global keydown handler take over
+        }
+      }
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         handleSubmit();
       }
     },
-    [handleSubmit]
+    [handleSubmit, fileSearchVisible]
   );
 
   const handleAddFile = () => {
@@ -219,10 +307,22 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
     .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
     .join(' ') || modelName;
 
+  const projectPath = currentProject.path;
+
   return (
     <div className="shrink-0 bg-bg px-4 py-3">
       <div className="max-w-3xl mx-auto">
         <div className="relative flex flex-col bg-surface rounded-xl border border-border focus-within:border-border-light transition-colors">
+          {/* @ File search popup */}
+          <FileSearchPopup
+            query={fileSearchQuery}
+            projectPath={projectPath}
+            visible={fileSearchVisible}
+            onSelect={handleFileSelect}
+            onClose={handleFileSearchClose}
+            anchorRef={textareaRef}
+          />
+
           {/* Attachment previews */}
           {attachments.length > 0 && (
             <div className="flex gap-2 px-3 pt-3 flex-wrap">
@@ -261,7 +361,7 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
           <textarea
             ref={textareaRef}
             value={value}
-            onChange={(e) => setValue(e.target.value)}
+            onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             placeholder="Ask Claude anything, @ to add files, / for commands"
             disabled={isStreaming}
@@ -305,7 +405,6 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
                            disabled:opacity-30 transition-colors"
                 title={currentMode.description}
               >
-                {/* Mode icon */}
                 {mode === 'ask' && (
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                     <path d="M8 14A6 6 0 108 2a6 6 0 000 12z" stroke="currentColor" strokeWidth="1.2" />
@@ -330,13 +429,11 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
                   </svg>
                 )}
                 <span>{currentMode.label}</span>
-                {/* Chevron */}
                 <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className={`transition-transform ${modeOpen ? 'rotate-180' : ''}`}>
                   <path d="M2.5 3.5L5 6.5l2.5-3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
 
-              {/* Mode dropdown menu */}
               {modeOpen && (
                 <div className="absolute bottom-full left-0 mb-1 w-56 bg-surface border border-border
                                 rounded-lg shadow-lg py-1 z-50">
@@ -390,14 +487,7 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
                 title="Stop generation"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <rect
-                    x="3"
-                    y="3"
-                    width="8"
-                    height="8"
-                    rx="1"
-                    fill="currentColor"
-                  />
+                  <rect x="3" y="3" width="8" height="8" rx="1" fill="currentColor" />
                 </svg>
               </button>
             ) : (
@@ -449,7 +539,6 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
                            hover:text-text-primary hover:bg-surface-hover transition-colors"
                 title="Switch branch"
               >
-                {/* Git branch icon */}
                 <svg width="11" height="11" viewBox="0 0 16 16" fill="none" className="shrink-0">
                   <circle cx="5" cy="4" r="1.5" stroke="currentColor" strokeWidth="1.2" />
                   <circle cx="5" cy="12" r="1.5" stroke="currentColor" strokeWidth="1.2" />
@@ -462,7 +551,6 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
                 </svg>
               </button>
 
-              {/* Branch dropdown */}
               {branchOpen && (
                 <div className="absolute bottom-full right-0 mb-1 w-64 bg-surface border border-border
                                 rounded-lg shadow-lg z-50 overflow-hidden">
@@ -471,6 +559,11 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
                   </div>
 
                   <div className="max-h-[240px] overflow-y-auto py-1">
+                    {branches.length === 0 && (
+                      <div className="px-3 py-3 text-center text-xs text-text-muted">
+                        Loading branches…
+                      </div>
+                    )}
                     {branches.map((b) => (
                       <button
                         key={b.name}
@@ -495,7 +588,6 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
                     ))}
                   </div>
 
-                  {/* Create new branch */}
                   <div className="border-t border-border">
                     {!showNewBranch ? (
                       <button

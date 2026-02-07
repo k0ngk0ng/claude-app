@@ -26,6 +26,7 @@ export interface GitAPI {
   listBranches: (cwd: string) => Promise<{ name: string; current: boolean }[]>;
   checkout: (cwd: string, branch: string) => Promise<string>;
   createBranch: (cwd: string, branch: string) => Promise<string>;
+  searchFiles: (cwd: string, query: string) => Promise<{ name: string; path: string }[]>;
 }
 
 export interface TerminalAPI {

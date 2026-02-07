@@ -129,7 +129,7 @@ export default function App() {
       {/* Main content area */}
       <div className="flex flex-1 flex-col min-w-0">
         {/* Top bar with drag region */}
-        <TopBar onNewThread={handleNewThread} />
+        <TopBar />
 
         {/* Chat area */}
         <div className="flex flex-1 min-h-0">
