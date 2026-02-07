@@ -3,7 +3,7 @@ import { claudeProcessManager } from './claude-process';
 import { sessionManager } from './session-manager';
 import { gitManager } from './git-manager';
 import { terminalManager } from './terminal-manager';
-import { getPlatform } from './platform';
+import { getPlatform, getClaudeModel } from './platform';
 import os from 'os';
 
 function getWebContents(): Electron.WebContents | null {
@@ -154,6 +154,10 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('app:getHomePath', () => {
     return os.homedir();
+  });
+
+  ipcMain.handle('app:getModel', () => {
+    return getClaudeModel();
   });
 
   // ─── Auto-watch sessions directory for changes ────────────────────

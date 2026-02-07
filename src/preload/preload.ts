@@ -43,6 +43,7 @@ export interface AppAPI {
   selectDirectory: () => Promise<string | null>;
   getPlatform: () => Promise<'mac' | 'windows' | 'linux'>;
   getHomePath: () => Promise<string>;
+  getModel: () => Promise<string>;
 }
 
 const claudeMessageListeners = new Map<Function, (...args: any[]) => void>();
@@ -142,5 +143,6 @@ contextBridge.exposeInMainWorld('api', {
     selectDirectory: () => ipcRenderer.invoke('app:selectDirectory'),
     getPlatform: () => ipcRenderer.invoke('app:getPlatform'),
     getHomePath: () => ipcRenderer.invoke('app:getHomePath'),
+    getModel: () => ipcRenderer.invoke('app:getModel'),
   } satisfies AppAPI,
 });

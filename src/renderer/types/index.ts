@@ -39,6 +39,7 @@ export interface AppAPI {
   selectDirectory: () => Promise<string | null>;
   getPlatform: () => Promise<'mac' | 'windows' | 'linux'>;
   getHomePath: () => Promise<string>;
+  getModel: () => Promise<string>;
 }
 
 export interface WindowAPI {

@@ -1,5 +1,6 @@
 import os from 'os';
 import path from 'path';
+import fs from 'fs';
 import { execSync } from 'child_process';
 
 const isMac = process.platform === 'darwin';
@@ -64,4 +65,32 @@ export function getPlatform(): 'mac' | 'windows' | 'linux' {
   if (isMac) return 'mac';
   if (isWindows) return 'windows';
   return 'linux';
+}
+
+/**
+ * Detect the active Claude model.
+ * Priority: ANTHROPIC_MODEL env → ~/.claude/settings.json env.ANTHROPIC_MODEL
+ *           → CLAUDE_CODE_MODEL env → settings.json env.CLAUDE_CODE_MODEL
+ *           → fallback "claude-sonnet-4-20250514"
+ */
+export function getClaudeModel(): string {
+  // 1. Check process env vars directly
+  if (process.env.ANTHROPIC_MODEL) return process.env.ANTHROPIC_MODEL;
+  if (process.env.CLAUDE_CODE_MODEL) return process.env.CLAUDE_CODE_MODEL;
+  if (process.env.CLAUDE_MODEL) return process.env.CLAUDE_MODEL;
+
+  // 2. Read from ~/.claude/settings.json
+  try {
+    const settingsPath = path.join(os.homedir(), '.claude', 'settings.json');
+    const content = fs.readFileSync(settingsPath, 'utf-8');
+    const settings = JSON.parse(content);
+    if (settings.env?.ANTHROPIC_MODEL) return settings.env.ANTHROPIC_MODEL;
+    if (settings.env?.CLAUDE_CODE_MODEL) return settings.env.CLAUDE_CODE_MODEL;
+    if (settings.env?.CLAUDE_MODEL) return settings.env.CLAUDE_MODEL;
+  } catch {
+    // settings.json not found or invalid
+  }
+
+  // 3. Fallback
+  return 'claude-sonnet-4-20250514';
 }
