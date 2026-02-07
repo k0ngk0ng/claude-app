@@ -3,6 +3,7 @@
   "productName": "Claude App",
   "version": "1.0.0",
   "description": "Desktop GUI for Claude Code CLI",
+  "author": "chenj",
   "main": ".vite/build/index.js",
   "scripts": {
     "start": "electron-forge start",
