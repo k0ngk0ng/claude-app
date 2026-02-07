@@ -151,30 +151,32 @@ export function useClaude() {
               } else if (evt.delta?.type === 'input_json_delta' && evt.delta.partial_json) {
                 // Accumulate tool input JSON for display
                 toolInputJsonRef.current += evt.delta.partial_json;
-                // Try to extract a brief description from the partial JSON
                 if (currentToolIdRef.current) {
-                  try {
-                    const partial = toolInputJsonRef.current;
-                    // Extract file_path, command, or pattern for display
+                  const partial = toolInputJsonRef.current;
+                  const { toolActivities } = useAppStore.getState();
+                  const activity = toolActivities.find(a => a.id === currentToolIdRef.current);
+                  if (activity) {
+                    // Extract a brief description from common fields
                     const fileMatch = partial.match(/"file_path"\s*:\s*"([^"]+)"/);
                     const cmdMatch = partial.match(/"command"\s*:\s*"([^"]+)"/);
                     const patternMatch = partial.match(/"pattern"\s*:\s*"([^"]+)"/);
-                    const input = fileMatch?.[1] || cmdMatch?.[1] || patternMatch?.[1];
-                    if (input) {
-                      const { toolActivities } = useAppStore.getState();
-                      const activity = toolActivities.find(a => a.id === currentToolIdRef.current);
-                      if (activity && !activity.input) {
-                        // Update with brief input description
-                        const brief = input.length > 60 ? '…' + input.slice(-57) : input;
-                        useAppStore.setState({
-                          toolActivities: toolActivities.map(a =>
-                            a.id === currentToolIdRef.current ? { ...a, input: brief } : a
-                          ),
-                        });
-                      }
-                    }
-                  } catch {
-                    // Ignore parse errors on partial JSON
+                    const urlMatch = partial.match(/"url"\s*:\s*"([^"]+)"/);
+                    const promptMatch = partial.match(/"prompt"\s*:\s*"([^"]{0,80})/);
+                    const descMatch = partial.match(/"description"\s*:\s*"([^"]{0,80})/);
+                    const input = fileMatch?.[1] || cmdMatch?.[1] || patternMatch?.[1]
+                      || urlMatch?.[1] || descMatch?.[1] || promptMatch?.[1];
+                    const brief = input
+                      ? (input.length > 60 ? '…' + input.slice(-57) : input)
+                      : undefined;
+
+                    // Always update inputFull, and set brief input once
+                    useAppStore.setState({
+                      toolActivities: toolActivities.map(a =>
+                        a.id === currentToolIdRef.current
+                          ? { ...a, inputFull: partial, input: a.input || brief }
+                          : a
+                      ),
+                    });
                   }
                 }
               }
@@ -182,9 +184,17 @@ export function useClaude() {
             }
 
             case 'content_block_stop': {
-              // If this was a tool use block, mark it as done
+              // Tool use block finished — keep as running until we get the result
+              // Save the final full input
               if (currentToolIdRef.current) {
-                updateToolActivity(currentToolIdRef.current, 'done');
+                const { toolActivities } = useAppStore.getState();
+                useAppStore.setState({
+                  toolActivities: toolActivities.map(a =>
+                    a.id === currentToolIdRef.current
+                      ? { ...a, inputFull: toolInputJsonRef.current || a.inputFull }
+                      : a
+                  ),
+                });
                 currentToolIdRef.current = null;
                 toolInputJsonRef.current = '';
               }
@@ -218,8 +228,30 @@ export function useClaude() {
 
         case 'user': {
           // Tool result — Claude CLI executed a tool and got results
-          // This means a new turn is about to start
-          // The tool activities are already marked done from content_block_stop
+          // Extract tool_use_id and result content to update the activity
+          const msg = event.message;
+          if (msg && Array.isArray(msg.content)) {
+            for (const block of msg.content as any[]) {
+              if (block.type === 'tool_result' && block.tool_use_id) {
+                const resultContent = typeof block.content === 'string'
+                  ? block.content
+                  : '';
+                // Truncate long results for display
+                const truncated = resultContent.length > 500
+                  ? resultContent.slice(0, 500) + '\n…(truncated)'
+                  : resultContent;
+
+                const { toolActivities } = useAppStore.getState();
+                useAppStore.setState({
+                  toolActivities: toolActivities.map(a =>
+                    a.id === block.tool_use_id
+                      ? { ...a, status: 'done' as const, output: truncated }
+                      : a
+                  ),
+                });
+              }
+            }
+          }
           break;
         }
 

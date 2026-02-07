@@ -119,14 +119,25 @@ function ToolActivityCard({ activity }: { activity: ToolActivity }) {
   const [expanded, setExpanded] = useState(false);
   const isRunning = activity.status === 'running';
 
+  // Format the full input JSON for display
+  const formattedInput = React.useMemo(() => {
+    if (!activity.inputFull) return null;
+    try {
+      const parsed = JSON.parse(activity.inputFull);
+      return JSON.stringify(parsed, null, 2);
+    } catch {
+      return activity.inputFull;
+    }
+  }, [activity.inputFull]);
+
+  const hasDetails = formattedInput || activity.output;
+
   return (
-    <div
-      className="rounded-lg bg-surface border border-border overflow-hidden"
-    >
+    <div className="rounded-lg bg-surface border border-border overflow-hidden">
       <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2.5 w-full px-3 py-2.5 text-left
-                   hover:bg-surface-hover transition-colors"
+        onClick={() => hasDetails && setExpanded(!expanded)}
+        className={`flex items-center gap-2.5 w-full px-3 py-2.5 text-left
+                   transition-colors ${hasDetails ? 'hover:bg-surface-hover cursor-pointer' : 'cursor-default'}`}
       >
         {/* Chevron */}
         <svg
@@ -136,7 +147,7 @@ function ToolActivityCard({ activity }: { activity: ToolActivity }) {
           fill="none"
           className={`shrink-0 text-text-muted transition-transform duration-150 ${
             expanded ? 'rotate-90' : ''
-          }`}
+          } ${!hasDetails ? 'opacity-30' : ''}`}
         >
           <path
             d="M4.5 2.5l3.5 3.5-3.5 3.5"
@@ -203,11 +214,28 @@ function ToolActivityCard({ activity }: { activity: ToolActivity }) {
       </button>
 
       {/* Expanded details */}
-      {expanded && activity.input && (
-        <div className="px-3 pb-2.5 pt-0 ml-[52px]">
-          <code className="text-xs text-text-muted font-mono break-all">
-            {activity.input}
-          </code>
+      {expanded && hasDetails && (
+        <div className="border-t border-border">
+          {/* Input */}
+          {formattedInput && (
+            <div className="px-3 py-2">
+              <div className="text-[10px] text-text-muted uppercase tracking-wider mb-1 font-medium">Input</div>
+              <pre className="text-xs text-text-secondary font-mono whitespace-pre-wrap break-all
+                              bg-bg rounded-md px-2.5 py-2 max-h-[200px] overflow-y-auto">
+                {formattedInput}
+              </pre>
+            </div>
+          )}
+          {/* Output */}
+          {activity.output && (
+            <div className="px-3 py-2 border-t border-border">
+              <div className="text-[10px] text-text-muted uppercase tracking-wider mb-1 font-medium">Output</div>
+              <pre className="text-xs text-text-secondary font-mono whitespace-pre-wrap break-all
+                              bg-bg rounded-md px-2.5 py-2 max-h-[300px] overflow-y-auto">
+                {activity.output}
+              </pre>
+            </div>
+          )}
         </div>
       )}
     </div>

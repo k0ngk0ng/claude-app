@@ -12,6 +12,8 @@ export interface ToolActivity {
   id: string;
   name: string;
   input?: string; // brief description of input
+  inputFull?: string; // full JSON input
+  output?: string; // tool result (truncated)
   status: 'running' | 'done';
   timestamp: number;
 }
