@@ -78,6 +78,8 @@ export function useClaude() {
   const processIdRef = useRef<string | null>(null);
   const streamingTextRef = useRef('');
   const currentModelRef = useRef<string | undefined>(undefined);
+  // Guard against duplicate result processing
+  const lastResultIdRef = useRef<string | null>(null);
 
   // Use a single stable handler registered ONCE — reads store actions via getState()
   useEffect(() => {
@@ -85,6 +87,11 @@ export function useClaude() {
       if (processId !== processIdRef.current) return;
 
       const event = raw as StreamEvent;
+
+      // Debug: log all events
+      if (event.type !== 'stream_event') {
+        console.log('[claude]', event.type, event.subtype || '', event);
+      }
       const {
         addMessage,
         setIsStreaming,
@@ -143,6 +150,14 @@ export function useClaude() {
         }
 
         case 'result': {
+          // Dedup guard — prevent processing the same result twice
+          const resultId = (raw as any).uuid || event.session_id || processId;
+          if (resultId === lastResultIdRef.current) {
+            console.log('[claude] duplicate result ignored', resultId);
+            break;
+          }
+          lastResultIdRef.current = resultId;
+
           setIsStreaming(false);
           clearStreamingContent();
 
