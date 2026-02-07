@@ -201,7 +201,7 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
             disabled={isStreaming}
             rows={2}
             className="flex-1 bg-transparent text-sm text-text-primary placeholder-text-muted
-                       px-3 py-3 resize-none outline-none min-h-[88px] max-h-[300px]
+                       px-3 py-2.5 resize-none outline-none min-h-[64px] max-h-[300px]
                        disabled:opacity-50"
           />
 

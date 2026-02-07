@@ -2,17 +2,31 @@ import React from 'react';
 import { ThreadList } from './ThreadList';
 import { useAppStore } from '../../stores/appStore';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { useSessions } from '../../hooks/useSessions';
 
 interface SidebarProps {
   onNewThread: () => void;
 }
 
 export function Sidebar({ onNewThread }: SidebarProps) {
-  const { platform } = useAppStore();
+  const { platform, setCurrentProject } = useAppStore();
   const { openSettings } = useSettingsStore();
-  const { loadSessions } = useSessions();
   const isMac = platform === 'mac';
+
+  const handleAddFolder = async () => {
+    const selected = await window.api.app.selectDirectory();
+    if (selected) {
+      const name = selected.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || selected;
+      setCurrentProject({ path: selected, name });
+
+      // Try to get git branch
+      try {
+        const branch = await window.api.git.branch(selected);
+        setCurrentProject({ path: selected, name, branch });
+      } catch {
+        // Not a git repo
+      }
+    }
+  };
 
   return (
     <div className="flex flex-col w-60 min-w-60 bg-sidebar border-r border-border h-full">
@@ -20,17 +34,17 @@ export function Sidebar({ onNewThread }: SidebarProps) {
       {isMac && <div className="titlebar-drag h-13 shrink-0" />}
       {!isMac && <div className="h-2 shrink-0" />}
 
-      {/* New thread button */}
-      <div className="px-3 pb-3">
+      {/* New thread + Add folder buttons */}
+      <div className="px-3 pb-2 flex gap-1.5">
         <button
           onClick={onNewThread}
-          className="flex items-center gap-2 w-full px-3 py-2 rounded-lg
+          className="flex items-center gap-2 flex-1 px-3 py-2 rounded-lg
                      bg-surface hover:bg-surface-hover text-text-primary text-sm
                      transition-colors duration-150 titlebar-no-drag"
         >
           <svg
-            width="16"
-            height="16"
+            width="15"
+            height="15"
             viewBox="0 0 16 16"
             fill="none"
             className="shrink-0"
@@ -44,36 +58,35 @@ export function Sidebar({ onNewThread }: SidebarProps) {
           </svg>
           <span>New thread</span>
         </button>
+        <button
+          onClick={handleAddFolder}
+          className="flex items-center justify-center w-9 h-9 rounded-lg
+                     bg-surface hover:bg-surface-hover text-text-secondary hover:text-text-primary
+                     transition-colors duration-150 titlebar-no-drag shrink-0"
+          title="Add folder"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path
+              d="M2 4.5A1.5 1.5 0 013.5 3H6l1.5 1.5h5A1.5 1.5 0 0114 6v5.5a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 012 11.5v-7z"
+              stroke="currentColor"
+              strokeWidth="1.2"
+            />
+            <path
+              d="M8 7v4M6 9h4"
+              stroke="currentColor"
+              strokeWidth="1.2"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
       </div>
 
       {/* Threads section */}
       <div className="flex-1 min-h-0 flex flex-col">
-        <div className="flex items-center justify-between px-4 py-2">
-          <span className="text-xs font-medium text-text-muted uppercase tracking-wider">
+        <div className="px-4 py-2">
+          <span className="text-[11px] font-medium text-text-muted uppercase tracking-wider">
             Threads
           </span>
-          <button
-            onClick={() => loadSessions()}
-            className="p-1 rounded text-text-muted hover:text-text-primary
-                       hover:bg-surface-hover transition-colors titlebar-no-drag"
-            title="Refresh threads"
-          >
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-              <path
-                d="M13.5 8a5.5 5.5 0 01-9.27 4.01M2.5 8a5.5 5.5 0 019.27-4.01"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-              <path
-                d="M13.5 3v5h-5M2.5 13V8h5"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
         </div>
         <ThreadList />
       </div>
