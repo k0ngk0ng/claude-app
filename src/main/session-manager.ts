@@ -4,6 +4,82 @@ import { getSessionsDir, encodePath } from './platform';
 
 const isWindows = process.platform === 'win32';
 
+/**
+ * Decode an encoded project directory name back to a real filesystem path.
+ * Claude Code encodes: / . : \ → -
+ * Strategy: split by -, then greedily rebuild path segments by checking
+ * which combinations exist on disk.
+ */
+function decodePath(encoded: string): string {
+  // Remove leading hyphen(s) — represents the leading /
+  const stripped = encoded.replace(/^-+/, '');
+  const parts = stripped.split('-');
+
+  if (isWindows) {
+    // Windows: first part might be drive letter
+    if (parts.length >= 2 && parts[0].length === 1 && /^[A-Za-z]$/.test(parts[0])) {
+      const drive = parts[0] + ':\\';
+      return drive + resolveSegments(parts.slice(1), drive);
+    }
+    return '\\' + resolveSegments(parts, '\\');
+  }
+
+  return '/' + resolveSegments(parts, '/');
+}
+
+/**
+ * Greedily resolve path segments. For each position, try joining
+ * the next N parts with '-' (for segments that originally contained hyphens or dots),
+ * and check if the resulting directory exists on disk.
+ */
+function resolveSegments(parts: string[], basePath: string): string {
+  const resolved: string[] = [];
+  let i = 0;
+
+  while (i < parts.length) {
+    let matched = false;
+
+    // Try longest possible segment first (greedy)
+    for (let len = parts.length - i; len > 1; len--) {
+      // Try with hyphens (original had hyphens)
+      const segHyphen = parts.slice(i, i + len).join('-');
+      const testHyphen = path.join(basePath, ...resolved, segHyphen);
+      if (fs.existsSync(testHyphen)) {
+        resolved.push(segHyphen);
+        i += len;
+        matched = true;
+        break;
+      }
+
+      // Try with dots (e.g., github.com, dev.azure.com)
+      const segDot = parts.slice(i, i + len).join('.');
+      const testDot = path.join(basePath, ...resolved, segDot);
+      if (fs.existsSync(testDot)) {
+        resolved.push(segDot);
+        i += len;
+        matched = true;
+        break;
+      }
+
+      // Try mixed: first parts with dots, rest with hyphens (e.g., dev.azure.com)
+      if (len >= 3) {
+        for (let dotLen = 2; dotLen < len; dotLen++) {
+          const segMixed = parts.slice(i, i + dotLen).join('.') + '/' + parts.slice(i + dotLen, i + len).join('-');
+          // Skip mixed — too complex, the greedy approach above handles most cases
+        }
+      }
+    }
+
+    if (!matched) {
+      // Single segment — just use as-is
+      resolved.push(parts[i]);
+      i++;
+    }
+  }
+
+  return resolved.join(isWindows ? '\\' : '/');
+}
+
 export interface SessionInfo {
   id: string;
   projectPath: string;
@@ -58,14 +134,11 @@ class SessionManager {
       for (const entry of entries) {
         if (entry.isDirectory()) {
           const encodedPath = entry.name;
-          // We don't try to decode the path here — it's lossy (hyphens are ambiguous).
-          // The real projectPath comes from sessions-index.json entries.
-          // We just use the last segment as a display name fallback.
-          const parts = encodedPath.replace(/^-+/, '').split('-');
-          const projectName = parts[parts.length - 1] || encodedPath;
+          const decodedPath = decodePath(encodedPath);
+          const projectName = path.basename(decodedPath);
           projects.push({
             name: projectName,
-            path: encodedPath, // Keep encoded — used as directory lookup key
+            path: decodedPath,
             encodedPath,
           });
         }
@@ -79,7 +152,7 @@ class SessionManager {
 
   listSessions(encodedOrPath: string): SessionIndexEntry[] {
     // If it looks like an encoded path (starts with -), use directly; otherwise encode it
-    const encoded = encodedOrPath.startsWith('-') || encodedOrPath.startsWith('Users')
+    const encoded = encodedOrPath.startsWith('-')
       ? encodedOrPath
       : encodePath(encodedOrPath);
     const projectDir = path.join(this.sessionsDir, encoded);
@@ -174,9 +247,11 @@ class SessionManager {
     const projects = this.listAllProjects();
 
     for (const project of projects) {
-      const sessions = this.listSessions(project.path);
+      // Use encodedPath for directory lookup
+      const sessions = this.listSessions(project.encodedPath);
       for (const session of sessions) {
         if (session.isSidechain) continue; // Skip sidechain sessions
+        // session.projectPath (from index) is the real path; project.path is decoded fallback
         const resolvedPath = session.projectPath || project.path;
         const resolvedName = resolvedPath
           ? resolvedPath.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || project.name
