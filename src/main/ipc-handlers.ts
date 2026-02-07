@@ -1,10 +1,11 @@
-import { ipcMain, dialog, BrowserWindow } from 'electron';
+import { ipcMain, dialog, BrowserWindow, shell } from 'electron';
 import { claudeProcessManager } from './claude-process';
 import { sessionManager } from './session-manager';
 import { gitManager } from './git-manager';
 import { terminalManager } from './terminal-manager';
 import { getPlatform, getClaudeModel } from './platform';
 import os from 'os';
+import { execFile } from 'child_process';
 
 function getWebContents(): Electron.WebContents | null {
   const windows = BrowserWindow.getAllWindows();
@@ -168,6 +169,108 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('app:getModel', () => {
     return getClaudeModel();
+  });
+
+  ipcMain.handle('app:openInEditor', async (_event, cwd: string, editor: string) => {
+    try {
+      switch (editor) {
+        case 'finder':
+          await shell.openPath(cwd);
+          return true;
+        case 'terminal': {
+          // Open native terminal at directory
+          const platform = getPlatform();
+          if (platform === 'mac') {
+            execFile('open', ['-a', 'Terminal', cwd]);
+          } else if (platform === 'windows') {
+            execFile('cmd', ['/c', 'start', 'cmd', '/K', `cd /d "${cwd}"`], { shell: true });
+          } else {
+            execFile('xdg-open', [cwd]);
+          }
+          return true;
+        }
+        case 'vscode':
+          execFile('code', [cwd]);
+          return true;
+        case 'cursor':
+          execFile('cursor', [cwd]);
+          return true;
+        case 'windsurf':
+          execFile('windsurf', [cwd]);
+          return true;
+        case 'zed':
+          execFile('zed', [cwd]);
+          return true;
+        case 'idea':
+          execFile('idea', [cwd]);
+          return true;
+        case 'webstorm':
+          execFile('webstorm', [cwd]);
+          return true;
+        case 'xcode':
+          execFile('open', ['-a', 'Xcode', cwd]);
+          return true;
+        default:
+          // Try to run the editor command directly
+          execFile(editor, [cwd]);
+          return true;
+      }
+    } catch (err) {
+      console.error(`Failed to open in ${editor}:`, err);
+      return false;
+    }
+  });
+
+  ipcMain.handle('app:getAvailableEditors', async () => {
+    const platform = getPlatform();
+    const editors: { id: string; name: string; icon?: string }[] = [];
+
+    // Always available
+    if (platform === 'mac') {
+      editors.push({ id: 'finder', name: 'Finder' });
+    } else if (platform === 'windows') {
+      editors.push({ id: 'finder', name: 'Explorer' });
+    } else {
+      editors.push({ id: 'finder', name: 'File Manager' });
+    }
+    editors.push({ id: 'terminal', name: 'Terminal' });
+
+    // Check for common editors
+    const editorChecks = [
+      { id: 'vscode', name: 'VS Code', cmd: 'code' },
+      { id: 'cursor', name: 'Cursor', cmd: 'cursor' },
+      { id: 'windsurf', name: 'Windsurf', cmd: 'windsurf' },
+      { id: 'zed', name: 'Zed', cmd: 'zed' },
+      { id: 'idea', name: 'IntelliJ IDEA', cmd: 'idea' },
+      { id: 'webstorm', name: 'WebStorm', cmd: 'webstorm' },
+    ];
+
+    if (platform === 'mac') {
+      editorChecks.push({ id: 'xcode', name: 'Xcode', cmd: 'xcode' });
+    }
+
+    const whichCmd = platform === 'windows' ? 'where' : 'which';
+
+    for (const editor of editorChecks) {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          execFile(whichCmd, [editor.cmd], (err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
+        editors.push({ id: editor.id, name: editor.name });
+      } catch {
+        // Editor not found, skip
+      }
+    }
+
+    return editors;
+  });
+
+  // ─── Git push ─────────────────────────────────────────────────────
+  ipcMain.handle('git:push', async (_event, cwd: string) => {
+    return gitManager.push(cwd);
   });
 
   // ─── Auto-watch sessions directory for changes ────────────────────

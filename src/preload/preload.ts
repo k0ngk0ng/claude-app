@@ -31,6 +31,7 @@ export interface GitAPI {
   checkout: (cwd: string, branch: string) => Promise<string>;
   createBranch: (cwd: string, branch: string) => Promise<string>;
   searchFiles: (cwd: string, query: string) => Promise<{ name: string; path: string }[]>;
+  push: (cwd: string) => Promise<string>;
 }
 
 export interface TerminalAPI {
@@ -48,6 +49,8 @@ export interface AppAPI {
   getPlatform: () => Promise<'mac' | 'windows' | 'linux'>;
   getHomePath: () => Promise<string>;
   getModel: () => Promise<string>;
+  openInEditor: (cwd: string, editor: string) => Promise<boolean>;
+  getAvailableEditors: () => Promise<{ id: string; name: string }[]>;
 }
 
 const claudeMessageListeners = new Map<Function, (...args: any[]) => void>();
@@ -117,6 +120,7 @@ contextBridge.exposeInMainWorld('api', {
     checkout: (cwd: string, branch: string) => ipcRenderer.invoke('git:checkout', cwd, branch),
     createBranch: (cwd: string, branch: string) => ipcRenderer.invoke('git:createBranch', cwd, branch),
     searchFiles: (cwd: string, query: string) => ipcRenderer.invoke('git:searchFiles', cwd, query),
+    push: (cwd: string) => ipcRenderer.invoke('git:push', cwd),
   } satisfies GitAPI,
 
   terminal: {
@@ -152,5 +156,7 @@ contextBridge.exposeInMainWorld('api', {
     getPlatform: () => ipcRenderer.invoke('app:getPlatform'),
     getHomePath: () => ipcRenderer.invoke('app:getHomePath'),
     getModel: () => ipcRenderer.invoke('app:getModel'),
+    openInEditor: (cwd: string, editor: string) => ipcRenderer.invoke('app:openInEditor', cwd, editor),
+    getAvailableEditors: () => ipcRenderer.invoke('app:getAvailableEditors'),
   } satisfies AppAPI,
 });

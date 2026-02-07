@@ -9,7 +9,6 @@ import { McpServersSection } from './McpServersSection';
 import { GitSection } from './GitSection';
 import { AppearanceSection } from './AppearanceSection';
 import { KeybindingsSection } from './KeybindingsSection';
-import { ArchivedThreadsSection } from './ArchivedThreadsSection';
 
 export function Settings() {
   const { activeTab, closeSettings } = useSettingsStore();
@@ -32,8 +31,6 @@ export function Settings() {
         return <AppearanceSection />;
       case 'keybindings':
         return <KeybindingsSection />;
-      case 'archived-threads':
-        return <ArchivedThreadsSection />;
       default:
         return <GeneralSection />;
     }

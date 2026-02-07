@@ -27,6 +27,7 @@ export interface GitAPI {
   checkout: (cwd: string, branch: string) => Promise<string>;
   createBranch: (cwd: string, branch: string) => Promise<string>;
   searchFiles: (cwd: string, query: string) => Promise<{ name: string; path: string }[]>;
+  push: (cwd: string) => Promise<string>;
 }
 
 export interface TerminalAPI {
@@ -44,6 +45,8 @@ export interface AppAPI {
   getPlatform: () => Promise<'mac' | 'windows' | 'linux'>;
   getHomePath: () => Promise<string>;
   getModel: () => Promise<string>;
+  openInEditor: (cwd: string, editor: string) => Promise<boolean>;
+  getAvailableEditors: () => Promise<{ id: string; name: string }[]>;
 }
 
 export interface WindowAPI {
@@ -165,8 +168,7 @@ export type SettingsTab =
   | 'mcp-servers'
   | 'git'
   | 'appearance'
-  | 'keybindings'
-  | 'archived-threads';
+  | 'keybindings';
 
 export type ThemeMode = 'dark' | 'light' | 'system';
 export type AutoApproveLevel = 'suggest' | 'auto-edit' | 'full-auto';

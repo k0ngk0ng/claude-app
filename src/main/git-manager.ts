@@ -205,6 +205,11 @@ class GitManager {
     return result.stderr || result.stdout;
   }
 
+  async push(cwd: string): Promise<string> {
+    const result = await this.exec(['push'], cwd);
+    return result.stderr || result.stdout;
+  }
+
   async isGitRepo(cwd: string): Promise<boolean> {
     try {
       await this.exec(['rev-parse', '--is-inside-work-tree'], cwd);

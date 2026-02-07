@@ -103,17 +103,6 @@ const navItems: NavItem[] = [
       </svg>
     ),
   },
-  {
-    id: 'archived-threads',
-    label: 'Archived Threads',
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-        <path d="M2 4h12v1.5H2V4z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-        <path d="M3 5.5v7h10v-7" stroke="currentColor" strokeWidth="1.3" />
-        <path d="M6 8.5h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-      </svg>
-    ),
-  },
 ];
 
 export function SettingsNav() {
