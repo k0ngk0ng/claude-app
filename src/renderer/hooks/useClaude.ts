@@ -233,9 +233,16 @@ export function useClaude() {
           if (msg && Array.isArray(msg.content)) {
             for (const block of msg.content as any[]) {
               if (block.type === 'tool_result' && block.tool_use_id) {
-                const resultContent = typeof block.content === 'string'
-                  ? block.content
-                  : '';
+                // Content can be a string OR an array of {type:"text", text:"..."} blocks
+                let resultContent = '';
+                if (typeof block.content === 'string') {
+                  resultContent = block.content;
+                } else if (Array.isArray(block.content)) {
+                  resultContent = block.content
+                    .filter((b: any) => b.type === 'text' && b.text)
+                    .map((b: any) => b.text)
+                    .join('\n');
+                }
                 // Truncate long results for display
                 const truncated = resultContent.length > 500
                   ? resultContent.slice(0, 500) + '\n…(truncated)'
@@ -245,7 +252,7 @@ export function useClaude() {
                 useAppStore.setState({
                   toolActivities: toolActivities.map(a =>
                     a.id === block.tool_use_id
-                      ? { ...a, status: 'done' as const, output: truncated }
+                      ? { ...a, status: 'done' as const, output: truncated || '(completed)' }
                       : a
                   ),
                 });
@@ -265,6 +272,16 @@ export function useClaude() {
 
           setIsStreaming(false);
           clearStreamingContent();
+
+          // Safety net: mark any still-running tools as done before clearing
+          const { toolActivities: remaining } = useAppStore.getState();
+          if (remaining.some(a => a.status === 'running')) {
+            useAppStore.setState({
+              toolActivities: remaining.map(a =>
+                a.status === 'running' ? { ...a, status: 'done' as const } : a
+              ),
+            });
+          }
           clearToolActivities();
 
           const resultText = typeof event.result === 'string'
@@ -290,6 +307,12 @@ export function useClaude() {
           if (event.session_id) {
             setCurrentSession({ id: event.session_id });
           }
+
+          // Clean up runtime cache for this session
+          const sessionKey = event.session_id || useAppStore.getState().currentSession.id;
+          if (sessionKey) {
+            useAppStore.getState().removeRuntime(sessionKey);
+          }
           break;
         }
 
@@ -308,6 +331,12 @@ export function useClaude() {
             content: `Error: ${errorText}`,
             timestamp: new Date().toISOString(),
           });
+
+          // Clean up runtime cache
+          const errSessionKey = useAppStore.getState().currentSession.id;
+          if (errSessionKey) {
+            useAppStore.getState().removeRuntime(errSessionKey);
+          }
           break;
         }
 
@@ -316,6 +345,13 @@ export function useClaude() {
           clearStreamingContent();
           clearToolActivities();
           setProcessId(null);
+
+          // Clean up runtime cache
+          const exitSessionKey = useAppStore.getState().currentSession.id;
+          if (exitSessionKey) {
+            useAppStore.getState().removeRuntime(exitSessionKey);
+          }
+
           processIdRef.current = null;
           streamingTextRef.current = '';
           break;

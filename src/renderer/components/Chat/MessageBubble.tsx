@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import type { Message } from '../../types';
+import { ToolCard } from './ToolCard';
 
 interface MessageBubbleProps {
   message: Message;
@@ -60,25 +61,51 @@ export function MessageBubble({ message, hideAvatar }: MessageBubbleProps) {
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <div
-          className={`text-[14px] leading-relaxed text-text-primary markdown-content ${
-            message.isStreaming ? 'streaming-cursor' : ''
-          }`}
-        >
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeHighlight]}
+        {message.content && (
+          <div
+            className={`text-[14px] leading-relaxed text-text-primary markdown-content ${
+              message.isStreaming ? 'streaming-cursor' : ''
+            }`}
           >
-            {message.content}
-          </ReactMarkdown>
-        </div>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeHighlight]}
+            >
+              {message.content}
+            </ReactMarkdown>
+          </div>
+        )}
 
-        {/* Tool use blocks */}
+        {/* Tool use blocks — same card style as live streaming */}
         {message.toolUse && message.toolUse.length > 0 && (
           <div className="mt-2 space-y-1.5">
-            {message.toolUse.map((tool, idx) => (
-              <ToolUseBlock key={idx} name={tool.name} input={tool.input} result={tool.result} />
-            ))}
+            {message.toolUse.map((tool, idx) => {
+              // Extract a brief input description from common fields
+              const input = tool.input;
+              const brief =
+                (input.file_path as string) ||
+                (input.command as string) ||
+                (input.pattern as string) ||
+                (input.url as string) ||
+                (input.description as string) ||
+                undefined;
+              const briefTruncated = brief
+                ? brief.length > 60
+                  ? '…' + brief.slice(-57)
+                  : brief
+                : undefined;
+
+              return (
+                <ToolCard
+                  key={idx}
+                  name={tool.name}
+                  input={briefTruncated}
+                  inputFull={JSON.stringify(input)}
+                  output={tool.result}
+                  status="done"
+                />
+              );
+            })}
           </div>
         )}
 
@@ -100,73 +127,6 @@ export function MessageBubble({ message, hideAvatar }: MessageBubbleProps) {
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function ToolUseBlock({
-  name,
-  input,
-  result,
-}: {
-  name: string;
-  input: Record<string, unknown>;
-  result?: string;
-}) {
-  const [expanded, setExpanded] = useState(false);
-
-  return (
-    <div className="border border-border rounded-lg overflow-hidden">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2 w-full px-3 py-2 text-left
-                   hover:bg-surface-hover transition-colors"
-      >
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 12 12"
-          fill="none"
-          className={`transition-transform duration-150 ${
-            expanded ? 'rotate-90' : ''
-          }`}
-        >
-          <path
-            d="M4.5 2.5l3.5 3.5-3.5 3.5"
-            stroke="currentColor"
-            strokeWidth="1.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-          <path
-            d="M6 3l-3 5 3 5h4l3-5-3-5H6z"
-            stroke="currentColor"
-            strokeWidth="1.2"
-            className="text-accent"
-          />
-        </svg>
-        <span className="text-xs font-medium text-text-secondary">{name}</span>
-      </button>
-
-      {expanded && (
-        <div className="px-3 py-2 border-t border-border bg-bg">
-          <pre className="text-xs text-text-secondary overflow-x-auto font-mono">
-            {JSON.stringify(input, null, 2)}
-          </pre>
-          {result && (
-            <div className="mt-2 pt-2 border-t border-border">
-              <div className="text-[10px] text-text-muted mb-1 uppercase tracking-wider">
-                Result
-              </div>
-              <pre className="text-xs text-text-secondary overflow-x-auto font-mono whitespace-pre-wrap">
-                {result}
-              </pre>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }

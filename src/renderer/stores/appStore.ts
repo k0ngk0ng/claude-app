@@ -18,6 +18,15 @@ export interface ToolActivity {
   timestamp: number;
 }
 
+// Per-session runtime state (preserved when switching threads)
+export interface SessionRuntime {
+  processId: string | null;
+  isStreaming: boolean;
+  streamingContent: string;
+  toolActivities: ToolActivity[];
+  messages: import('../types').Message[];
+}
+
 interface AppStore {
   // Current session state
   currentSession: CurrentSession;
@@ -31,6 +40,8 @@ interface AppStore {
   };
   streamingContent: string;
   toolActivities: ToolActivity[];
+  // Per-session runtime cache (keyed by session id or processId)
+  sessionRuntimes: Map<string, SessionRuntime>;
   gitStatus: GitStatus | null;
   platform: 'mac' | 'windows' | 'linux';
 
@@ -63,6 +74,11 @@ interface AppStore {
   addToolActivity: (activity: ToolActivity) => void;
   updateToolActivity: (id: string, status: 'done') => void;
   clearToolActivities: () => void;
+
+  // Session runtime save/restore
+  saveCurrentRuntime: () => void;
+  restoreRuntime: (sessionKey: string) => boolean;
+  removeRuntime: (sessionKey: string) => void;
 
   // Git
   setGitStatus: (status: GitStatus | null) => void;
@@ -99,6 +115,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
   streamingContent: '',
   toolActivities: [],
+  sessionRuntimes: new Map(),
   gitStatus: null,
   platform: 'mac',
 
@@ -199,6 +216,49 @@ export const useAppStore = create<AppStore>((set, get) => ({
       ),
     })),
   clearToolActivities: () => set({ toolActivities: [] }),
+
+  // Session runtime save/restore
+  saveCurrentRuntime: () => {
+    const state = get();
+    const key = state.currentSession.id || state.currentSession.processId;
+    if (!key) return;
+    // Only save if there's something worth saving (streaming or has a process)
+    if (!state.currentSession.isStreaming && !state.currentSession.processId) return;
+    const runtimes = new Map(state.sessionRuntimes);
+    runtimes.set(key, {
+      processId: state.currentSession.processId,
+      isStreaming: state.currentSession.isStreaming,
+      streamingContent: state.streamingContent,
+      toolActivities: [...state.toolActivities],
+      messages: [...state.currentSession.messages],
+    });
+    set({ sessionRuntimes: runtimes });
+  },
+
+  restoreRuntime: (sessionKey: string) => {
+    const state = get();
+    const runtime = state.sessionRuntimes.get(sessionKey);
+    if (!runtime) return false;
+    set({
+      currentSession: {
+        ...state.currentSession,
+        id: sessionKey,
+        processId: runtime.processId,
+        isStreaming: runtime.isStreaming,
+        messages: runtime.messages,
+      },
+      streamingContent: runtime.streamingContent,
+      toolActivities: runtime.toolActivities,
+    });
+    return true;
+  },
+
+  removeRuntime: (sessionKey: string) => {
+    const state = get();
+    const runtimes = new Map(state.sessionRuntimes);
+    runtimes.delete(sessionKey);
+    set({ sessionRuntimes: runtimes });
+  },
 
   // Git
   setGitStatus: (status) => set({ gitStatus: status }),

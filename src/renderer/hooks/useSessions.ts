@@ -133,6 +133,8 @@ export function useSessions() {
     setCurrentSession,
     resetCurrentSession,
     setCurrentProject,
+    saveCurrentRuntime,
+    restoreRuntime,
     sessions,
     currentSession,
   } = useAppStore();
@@ -166,18 +168,31 @@ export function useSessions() {
 
   const selectSession = useCallback(
     async (session: SessionInfo) => {
-      const messages = await loadSessionMessages(
-        session.projectPath,
-        session.id
-      );
+      // Save current session's runtime state before switching
+      saveCurrentRuntime();
 
-      setCurrentSession({
-        id: session.id,
-        projectPath: session.projectPath,
-        messages,
-        isStreaming: false,
-        processId: null,
-      });
+      // Try to restore cached runtime for the target session
+      const restored = restoreRuntime(session.id);
+
+      if (!restored) {
+        // No cached runtime — load messages from disk
+        const messages = await loadSessionMessages(
+          session.projectPath,
+          session.id
+        );
+
+        setCurrentSession({
+          id: session.id,
+          projectPath: session.projectPath,
+          messages,
+          isStreaming: false,
+          processId: null,
+        });
+
+        // Clear streaming state for non-running sessions
+        useAppStore.getState().clearStreamingContent();
+        useAppStore.getState().clearToolActivities();
+      }
 
       // Switch current project to match the selected thread
       const projectName = session.projectPath.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || session.projectName;
@@ -191,11 +206,14 @@ export function useSessions() {
         // Not a git repo
       }
     },
-    [loadSessionMessages, setCurrentSession, setCurrentProject]
+    [loadSessionMessages, setCurrentSession, setCurrentProject, saveCurrentRuntime, restoreRuntime]
   );
 
   const createNewSession = useCallback(
     (projectPath: string) => {
+      // Save current session's runtime state before switching
+      saveCurrentRuntime();
+
       resetCurrentSession();
       setCurrentSession({
         projectPath,
@@ -205,7 +223,7 @@ export function useSessions() {
         isStreaming: false,
       });
     },
-    [resetCurrentSession, setCurrentSession]
+    [resetCurrentSession, setCurrentSession, saveCurrentRuntime]
   );
 
   const listProjects = useCallback(async () => {
