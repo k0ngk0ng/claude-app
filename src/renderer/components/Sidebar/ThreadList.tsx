@@ -81,6 +81,7 @@ export function ThreadList() {
             {/* Project folder header */}
             <button
               onClick={() => toggleProject(key)}
+              title={group.projectPath}
               className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md
                          text-text-secondary hover:text-text-primary hover:bg-surface-hover
                          transition-colors group"
