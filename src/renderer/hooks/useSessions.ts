@@ -59,11 +59,15 @@ export function useSessions() {
   const loadSessionMessages = useCallback(
     async (projectPath: string, sessionId: string): Promise<Message[]> => {
       try {
+        console.log('[loadSessionMessages] Fetching:', projectPath, sessionId);
         const rawMessages = await window.api.sessions.getMessages(
           projectPath,
           sessionId
         );
-        return parseRawMessages(rawMessages);
+        console.log('[loadSessionMessages] Raw messages:', rawMessages.length);
+        const parsed = parseRawMessages(rawMessages);
+        console.log('[loadSessionMessages] Parsed messages:', parsed.length);
+        return parsed;
       } catch (err) {
         console.error('Failed to load session messages:', err);
         return [];
@@ -74,10 +78,12 @@ export function useSessions() {
 
   const selectSession = useCallback(
     async (session: SessionInfo) => {
+      console.log('[selectSession] Loading session:', session.id, 'project:', session.projectPath);
       const messages = await loadSessionMessages(
         session.projectPath,
         session.id
       );
+      console.log('[selectSession] Loaded messages:', messages.length);
 
       setCurrentSession({
         id: session.id,

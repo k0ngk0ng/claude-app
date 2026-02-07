@@ -47,17 +47,9 @@ export function getHomePath(): string {
 }
 
 export function encodePath(absolutePath: string): string {
-  // Claude CLI encodes project paths by replacing path separators with hyphens
-  // and removing the leading separator.
-  // On Windows, paths look like "C:\Users\..." — we strip the leading separator
-  // and replace colons (from drive letters) as well.
-  let normalized = absolutePath;
-  // Remove leading slash (Unix) or backslash (Windows UNC)
-  if (normalized.startsWith('/') || normalized.startsWith('\\')) {
-    normalized = normalized.slice(1);
-  }
-  // Replace colons (Windows drive letters like "C:"), forward slashes, and backslashes
-  return normalized.replace(/[:/\\]/g, '-');
+  // Claude CLI encodes project paths by replacing /, \, :, . with hyphens.
+  // The leading slash becomes a leading hyphen (e.g. /Users/foo → -Users-foo).
+  return absolutePath.replace(/[/\\:.]/g, '-');
 }
 
 export function getDefaultShell(): string {
