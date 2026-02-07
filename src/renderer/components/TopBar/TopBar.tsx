@@ -18,7 +18,7 @@ export function TopBar({ onNewThread }: TopBarProps) {
     <div
       className={`
         flex items-center justify-between px-4 h-12 shrink-0
-        border-b border-border bg-bg titlebar-drag
+        bg-bg titlebar-drag
         ${isMac && !panels.sidebar ? 'pl-20' : ''}
       `}
     >

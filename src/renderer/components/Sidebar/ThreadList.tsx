@@ -1,65 +1,137 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ThreadItem } from './ThreadItem';
 import { useAppStore } from '../../stores/appStore';
 import type { SessionInfo } from '../../types';
 
-function groupByDate(sessions: SessionInfo[]): Record<string, SessionInfo[]> {
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterday = new Date(today.getTime() - 86400000);
-  const weekAgo = new Date(today.getTime() - 7 * 86400000);
+interface ProjectGroup {
+  projectName: string;
+  projectPath: string;
+  sessions: SessionInfo[];
+}
 
-  const groups: Record<string, SessionInfo[]> = {
-    Today: [],
-    Yesterday: [],
-    'Previous 7 days': [],
-    Older: [],
-  };
+function groupByProject(sessions: SessionInfo[]): ProjectGroup[] {
+  const map = new Map<string, ProjectGroup>();
 
   for (const session of sessions) {
-    const date = session.updatedAt ? new Date(session.updatedAt) : new Date(0);
-
-    if (date >= today) {
-      groups['Today'].push(session);
-    } else if (date >= yesterday) {
-      groups['Yesterday'].push(session);
-    } else if (date >= weekAgo) {
-      groups['Previous 7 days'].push(session);
-    } else {
-      groups['Older'].push(session);
+    const key = session.projectPath || session.projectName;
+    if (!map.has(key)) {
+      map.set(key, {
+        projectName: session.projectName,
+        projectPath: session.projectPath,
+        sessions: [],
+      });
     }
+    map.get(key)!.sessions.push(session);
   }
+
+  // Sort groups: most recently updated project first
+  const groups = Array.from(map.values());
+  groups.sort((a, b) => {
+    const aTime = a.sessions[0]?.updatedAt ? new Date(a.sessions[0].updatedAt).getTime() : 0;
+    const bTime = b.sessions[0]?.updatedAt ? new Date(b.sessions[0].updatedAt).getTime() : 0;
+    return bTime - aTime;
+  });
 
   return groups;
 }
 
+function formatRelativeTime(dateStr: string): string {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  const diffMonths = Math.floor(diffDays / 30);
+
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m`;
+  if (diffHours < 24) return `${diffHours}h`;
+  if (diffDays < 30) return `${diffDays}d`;
+  return `${diffMonths}mo`;
+}
+
 export function ThreadList() {
   const { sessions, currentSession } = useAppStore();
+  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
 
-  const grouped = useMemo(() => groupByDate(sessions), [sessions]);
+  const projectGroups = useMemo(() => groupByProject(sessions), [sessions]);
 
-  const groupOrder = ['Today', 'Yesterday', 'Previous 7 days', 'Older'];
+  const toggleProject = (key: string) => {
+    setCollapsedProjects((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
 
   return (
     <div className="flex-1 overflow-y-auto px-2">
-      {groupOrder.map((groupName) => {
-        const items = grouped[groupName];
-        if (!items || items.length === 0) return null;
+      {projectGroups.map((group) => {
+        const key = group.projectPath || group.projectName;
+        const isCollapsed = collapsedProjects.has(key);
 
         return (
-          <div key={groupName} className="mb-3">
-            <div className="px-2 py-1.5">
-              <span className="text-xs text-text-muted font-medium">
-                {groupName}
+          <div key={key} className="mb-1">
+            {/* Project folder header */}
+            <button
+              onClick={() => toggleProject(key)}
+              className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md
+                         text-text-secondary hover:text-text-primary hover:bg-surface-hover
+                         transition-colors group"
+            >
+              {/* Folder icon */}
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="shrink-0 opacity-60">
+                <path
+                  d="M2 4.5A1.5 1.5 0 013.5 3H6l1.5 1.5h5A1.5 1.5 0 0114 6v5.5a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 012 11.5v-7z"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                />
+              </svg>
+              <span className="text-xs font-medium truncate flex-1 text-left">
+                {group.projectName}
               </span>
-            </div>
-            {items.map((session) => (
-              <ThreadItem
-                key={session.id}
-                session={session}
-                isActive={currentSession.id === session.id}
-              />
-            ))}
+              {/* Collapse indicator + count */}
+              <span className="text-[10px] text-text-muted opacity-0 group-hover:opacity-100 transition-opacity">
+                {group.sessions.length}
+              </span>
+              <svg
+                width="10"
+                height="10"
+                viewBox="0 0 10 10"
+                fill="none"
+                className={`shrink-0 opacity-40 transition-transform duration-150 ${
+                  isCollapsed ? '-rotate-90' : ''
+                }`}
+              >
+                <path
+                  d="M3 4l2 2 2-2"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+
+            {/* Thread items */}
+            {!isCollapsed && (
+              <div className="ml-1">
+                {group.sessions.map((session) => (
+                  <ThreadItem
+                    key={session.id}
+                    session={session}
+                    isActive={currentSession.id === session.id}
+                    timeLabel={formatRelativeTime(session.updatedAt)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         );
       })}
