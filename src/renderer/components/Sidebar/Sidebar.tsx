@@ -2,15 +2,25 @@ import React from 'react';
 import { ThreadList } from './ThreadList';
 import { useAppStore } from '../../stores/appStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { useResizable } from '../../hooks/useResizable';
 
 interface SidebarProps {
   onNewThread: () => void;
 }
 
 export function Sidebar({ onNewThread }: SidebarProps) {
-  const { platform, setCurrentProject } = useAppStore();
+  const { platform, setCurrentProject, panelSizes, setPanelSize } = useAppStore();
   const { openSettings } = useSettingsStore();
   const isMac = platform === 'mac';
+
+  const { handleMouseDown } = useResizable({
+    direction: 'horizontal',
+    size: panelSizes.sidebar,
+    minSize: 180,
+    maxSize: 480,
+    reverse: true,
+    onResize: (size) => setPanelSize('sidebar', size),
+  });
 
   const handleAddFolder = async () => {
     const selected = await window.api.app.selectDirectory();
@@ -29,7 +39,10 @@ export function Sidebar({ onNewThread }: SidebarProps) {
   };
 
   return (
-    <div className="flex flex-col w-60 min-w-60 bg-sidebar border-r border-border h-full">
+    <div
+      className="relative flex flex-col bg-sidebar border-r border-border h-full shrink-0"
+      style={{ width: panelSizes.sidebar }}
+    >
       {/* Drag region for macOS traffic lights */}
       {isMac && <div className="titlebar-drag h-13 shrink-0" />}
       {!isMac && <div className="h-2 shrink-0" />}
@@ -120,6 +133,13 @@ export function Sidebar({ onNewThread }: SidebarProps) {
           <span>Settings</span>
         </button>
       </div>
+
+      {/* Right-edge resize handle */}
+      <div
+        onMouseDown={handleMouseDown}
+        className="absolute top-0 right-0 w-1 h-full cursor-col-resize
+                   hover:bg-accent/40 active:bg-accent/60 transition-colors z-10"
+      />
     </div>
   );
 }

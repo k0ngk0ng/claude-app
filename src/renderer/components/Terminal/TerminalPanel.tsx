@@ -4,9 +4,10 @@ import '@xterm/xterm/css/xterm.css';
 import { FitAddon } from '@xterm/addon-fit';
 import { useTerminal } from '../../hooks/useTerminal';
 import { useAppStore } from '../../stores/appStore';
+import { useResizable } from '../../hooks/useResizable';
 
 export function TerminalPanel() {
-  const { currentProject, togglePanel } = useAppStore();
+  const { currentProject, togglePanel, panelSizes, setPanelSize } = useAppStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -22,6 +23,26 @@ export function TerminalPanel() {
   const resizeRef = useRef(resizeTerminal);
   writeRef.current = writeToTerminal;
   resizeRef.current = resizeTerminal;
+
+  const { handleMouseDown } = useResizable({
+    direction: 'vertical',
+    size: panelSizes.terminal,
+    minSize: 120,
+    maxSize: 600,
+    reverse: false,
+    onResize: (size) => setPanelSize('terminal', size),
+  });
+
+  // Re-fit terminal when panel size changes
+  useEffect(() => {
+    if (fitAddonRef.current) {
+      try {
+        fitAddonRef.current.fit();
+      } catch {
+        // Ignore fit errors during transitions
+      }
+    }
+  }, [panelSizes.terminal]);
 
   const initTerminal = useCallback(async () => {
     if (!containerRef.current || initializedRef.current) return;
@@ -121,7 +142,17 @@ export function TerminalPanel() {
   }, [initTerminal]);
 
   return (
-    <div className="shrink-0 border-t border-border bg-bg panel-transition" style={{ height: 250 }}>
+    <div
+      className="relative shrink-0 border-t border-border bg-bg panel-transition"
+      style={{ height: panelSizes.terminal }}
+    >
+      {/* Top-edge resize handle */}
+      <div
+        onMouseDown={handleMouseDown}
+        className="absolute top-0 left-0 right-0 h-1 cursor-row-resize
+                   hover:bg-accent/40 active:bg-accent/60 transition-colors z-10"
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-surface">
         <div className="flex items-center gap-2">

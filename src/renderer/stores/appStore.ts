@@ -4,6 +4,7 @@ import type {
   SessionInfo,
   GitStatus,
   PanelState,
+  PanelSizes,
   CurrentSession,
 } from '../types';
 
@@ -12,6 +13,7 @@ interface AppStore {
   currentSession: CurrentSession;
   sessions: SessionInfo[];
   panels: PanelState;
+  panelSizes: PanelSizes;
   currentProject: {
     path: string;
     name: string;
@@ -35,6 +37,7 @@ interface AppStore {
   // Panel actions
   togglePanel: (panel: keyof PanelState) => void;
   setPanel: (panel: keyof PanelState, open: boolean) => void;
+  setPanelSize: (panel: keyof PanelSizes, size: number) => void;
 
   // Project actions
   setCurrentProject: (project: { path: string; name: string; branch?: string }) => void;
@@ -67,6 +70,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
     sidebar: true,
     terminal: false,
     diff: false,
+  },
+  panelSizes: {
+    sidebar: 240,
+    terminal: 250,
+    diff: 400,
   },
   currentProject: {
     path: '',
@@ -131,6 +139,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
   setPanel: (panel, open) =>
     set((state) => ({
       panels: { ...state.panels, [panel]: open },
+    })),
+
+  setPanelSize: (panel, size) =>
+    set((state) => ({
+      panelSizes: { ...state.panelSizes, [panel]: size },
     })),
 
   // Project

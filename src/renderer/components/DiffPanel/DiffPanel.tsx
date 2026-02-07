@@ -1,19 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { useGit } from '../../hooks/useGit';
 import { useAppStore } from '../../stores/appStore';
+import { useResizable } from '../../hooks/useResizable';
 import { DiffView } from './DiffView';
 import type { FileChange } from '../../types';
 
 type TabType = 'unstaged' | 'staged';
 
 export function DiffPanel() {
-  const { togglePanel } = useAppStore();
+  const { togglePanel, panelSizes, setPanelSize } = useAppStore();
   const { gitStatus, stageFile, unstageFile, commit, getDiff, refreshStatus } = useGit();
   const [activeTab, setActiveTab] = useState<TabType>('unstaged');
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [diffContent, setDiffContent] = useState<string>('');
   const [commitMessage, setCommitMessage] = useState('');
   const [isCommitting, setIsCommitting] = useState(false);
+
+  const { handleMouseDown } = useResizable({
+    direction: 'horizontal',
+    size: panelSizes.diff,
+    minSize: 250,
+    maxSize: 700,
+    reverse: false,
+    onResize: (size) => setPanelSize('diff', size),
+  });
 
   const files = activeTab === 'unstaged'
     ? gitStatus?.unstaged || []
@@ -60,7 +70,17 @@ export function DiffPanel() {
   const stagedCount = gitStatus?.staged.length || 0;
 
   return (
-    <div className="w-[400px] min-w-[300px] border-l border-border bg-bg flex flex-col h-full panel-transition">
+    <div
+      className="relative border-l border-border bg-bg flex flex-col h-full panel-transition shrink-0"
+      style={{ width: panelSizes.diff }}
+    >
+      {/* Left-edge resize handle */}
+      <div
+        onMouseDown={handleMouseDown}
+        className="absolute top-0 left-0 w-1 h-full cursor-col-resize
+                   hover:bg-accent/40 active:bg-accent/60 transition-colors z-10"
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
         <span className="text-sm font-medium text-text-primary">Changes</span>

@@ -254,6 +254,12 @@ export interface PanelState {
   diff: boolean;
 }
 
+export interface PanelSizes {
+  sidebar: number;   // width in px
+  terminal: number;  // height in px
+  diff: number;      // width in px
+}
+
 export interface AppState {
   currentSession: CurrentSession;
   sessions: SessionInfo[];
