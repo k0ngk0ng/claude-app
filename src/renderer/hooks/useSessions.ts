@@ -1,37 +1,128 @@
 import { useCallback } from 'react';
 import { useAppStore } from '../stores/appStore';
-import type { SessionInfo, Message, ContentBlock } from '../types';
+import type { SessionInfo, Message, ContentBlock, ToolUseInfo } from '../types';
 
 function parseRawMessages(rawMessages: any[]): Message[] {
   const messages: Message[] = [];
 
+  // Collect tool results keyed by tool_use_id for matching
+  const toolResults = new Map<string, string>();
   for (const raw of rawMessages) {
     if (!raw.message) continue;
-
-    const role = raw.message.role as 'user' | 'assistant' | 'system';
-    let content = '';
-    let contentBlocks: ContentBlock[] | undefined;
-
-    if (typeof raw.message.content === 'string') {
-      content = raw.message.content;
-    } else if (Array.isArray(raw.message.content)) {
-      contentBlocks = raw.message.content;
-      content = raw.message.content
-        .filter((b: ContentBlock) => b.type === 'text' && b.text)
-        .map((b: ContentBlock) => b.text!)
-        .join('\n');
-    }
-
-    if (content || contentBlocks) {
-      messages.push({
-        id: raw.uuid || crypto.randomUUID(),
-        role,
-        content,
-        contentBlocks,
-        timestamp: raw.timestamp || new Date().toISOString(),
-      });
+    const content = raw.message.content;
+    if (!Array.isArray(content)) continue;
+    for (const block of content) {
+      if (block.type === 'tool_result' && block.tool_use_id) {
+        let resultText = '';
+        if (typeof block.content === 'string') {
+          resultText = block.content;
+        } else if (Array.isArray(block.content)) {
+          resultText = block.content
+            .filter((b: any) => b.type === 'text' && b.text)
+            .map((b: any) => b.text)
+            .join('\n');
+        }
+        toolResults.set(block.tool_use_id, resultText.slice(0, 2000));
+      }
     }
   }
+
+  // Now build display messages
+  // Strategy: merge consecutive assistant entries into one message
+  let currentAssistant: {
+    texts: string[];
+    tools: ToolUseInfo[];
+    timestamp: string;
+    id: string;
+  } | null = null;
+
+  function flushAssistant() {
+    if (!currentAssistant) return;
+    const content = currentAssistant.texts.join('\n\n').trim();
+    // Only add if there's text content or tool use
+    if (content || currentAssistant.tools.length > 0) {
+      messages.push({
+        id: currentAssistant.id,
+        role: 'assistant',
+        content: content,
+        toolUse: currentAssistant.tools.length > 0 ? currentAssistant.tools : undefined,
+        timestamp: currentAssistant.timestamp,
+      });
+    }
+    currentAssistant = null;
+  }
+
+  for (const raw of rawMessages) {
+    const type = raw.type;
+
+    // Skip non-message types
+    if (!raw.message || type === 'progress' || type === 'file-history-snapshot') continue;
+
+    const role = raw.message.role as string;
+    const content = raw.message.content;
+    const timestamp = raw.timestamp || new Date().toISOString();
+    const id = raw.uuid || crypto.randomUUID();
+
+    if (role === 'user') {
+      // Flush any pending assistant message
+      flushAssistant();
+
+      // Extract user text
+      let userText = '';
+      if (typeof content === 'string') {
+        userText = content;
+      } else if (Array.isArray(content)) {
+        // User messages may have tool_result blocks — skip those
+        const textParts = content
+          .filter((b: any) => b.type === 'text' && b.text)
+          .map((b: any) => b.text);
+        userText = textParts.join('\n');
+      }
+
+      // Only add user messages with actual text (skip tool_result-only messages)
+      if (userText.trim()) {
+        messages.push({
+          id,
+          role: 'user',
+          content: userText,
+          timestamp,
+        });
+      }
+    } else if (role === 'assistant') {
+      // Start or continue building an assistant message
+      if (!currentAssistant) {
+        currentAssistant = {
+          texts: [],
+          tools: [],
+          timestamp,
+          id,
+        };
+      }
+
+      if (typeof content === 'string') {
+        if (content.trim()) {
+          currentAssistant.texts.push(content);
+        }
+      } else if (Array.isArray(content)) {
+        for (const block of content) {
+          if (block.type === 'text' && block.text?.trim()) {
+            currentAssistant.texts.push(block.text);
+          } else if (block.type === 'tool_use') {
+            const result = block.id ? toolResults.get(block.id) : undefined;
+            currentAssistant.tools.push({
+              name: block.name || 'unknown',
+              input: block.input || {},
+              result: result,
+            });
+          }
+          // Skip 'thinking' blocks — don't display them
+        }
+      }
+    }
+  }
+
+  // Flush last assistant message
+  flushAssistant();
 
   return messages;
 }
@@ -59,15 +150,11 @@ export function useSessions() {
   const loadSessionMessages = useCallback(
     async (projectPath: string, sessionId: string): Promise<Message[]> => {
       try {
-        console.log('[loadSessionMessages] Fetching:', projectPath, sessionId);
         const rawMessages = await window.api.sessions.getMessages(
           projectPath,
           sessionId
         );
-        console.log('[loadSessionMessages] Raw messages:', rawMessages.length);
-        const parsed = parseRawMessages(rawMessages);
-        console.log('[loadSessionMessages] Parsed messages:', parsed.length);
-        return parsed;
+        return parseRawMessages(rawMessages);
       } catch (err) {
         console.error('Failed to load session messages:', err);
         return [];
@@ -78,12 +165,10 @@ export function useSessions() {
 
   const selectSession = useCallback(
     async (session: SessionInfo) => {
-      console.log('[selectSession] Loading session:', session.id, 'project:', session.projectPath);
       const messages = await loadSessionMessages(
         session.projectPath,
         session.id
       );
-      console.log('[selectSession] Loaded messages:', messages.length);
 
       setCurrentSession({
         id: session.id,
