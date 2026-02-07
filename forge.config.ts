@@ -19,7 +19,7 @@ const config: ForgeConfig = {
     new MakerSquirrel({
       name: 'claude-app',
       setupIcon: './assets/icon.ico',
-      authors: 'chenj',
+      authors: 'k0ngk0ng',
     }),
     new MakerDeb({
       options: {
