@@ -82,23 +82,91 @@ class SessionManager {
     const encoded = encodedOrPath.startsWith('-') || encodedOrPath.startsWith('Users')
       ? encodedOrPath
       : encodePath(encodedOrPath);
-    const indexPath = path.join(this.sessionsDir, encoded, 'sessions-index.json');
+    const projectDir = path.join(this.sessionsDir, encoded);
+    const indexPath = path.join(projectDir, 'sessions-index.json');
 
     try {
       const content = fs.readFileSync(indexPath, 'utf-8');
       const parsed: SessionIndexFile = JSON.parse(content);
-      // The file format is { version: 1, entries: [...] }
       if (parsed && Array.isArray(parsed.entries)) {
         return parsed.entries;
       }
-      // Fallback: if it's already an array
       if (Array.isArray(parsed)) {
         return parsed;
       }
       return [];
     } catch {
-      return [];
+      // No sessions-index.json — fallback: scan .jsonl files
+      return this.scanJsonlFiles(projectDir);
     }
+  }
+
+  /**
+   * Fallback for projects without sessions-index.json.
+   * Scans .jsonl files and extracts basic session info.
+   */
+  private scanJsonlFiles(projectDir: string): SessionIndexEntry[] {
+    const entries: SessionIndexEntry[] = [];
+
+    try {
+      const files = fs.readdirSync(projectDir);
+      for (const file of files) {
+        if (!file.endsWith('.jsonl')) continue;
+        const sessionId = file.replace('.jsonl', '');
+        const filePath = path.join(projectDir, file);
+
+        try {
+          const stat = fs.statSync(filePath);
+          // Read first few lines to get the first user prompt
+          const fd = fs.openSync(filePath, 'r');
+          const buf = Buffer.alloc(4096);
+          const bytesRead = fs.readSync(fd, buf, 0, 4096, 0);
+          fs.closeSync(fd);
+
+          const head = buf.toString('utf-8', 0, bytesRead);
+          const lines = head.split('\n').filter((l) => l.trim());
+
+          let firstPrompt = '';
+          for (const line of lines) {
+            try {
+              const parsed = JSON.parse(line);
+              if (parsed.type === 'user' && parsed.message?.role === 'user') {
+                const content = parsed.message.content;
+                if (typeof content === 'string') {
+                  firstPrompt = content.slice(0, 200);
+                } else if (Array.isArray(content)) {
+                  const textBlock = content.find((b: any) => b.type === 'text' && b.text);
+                  if (textBlock) firstPrompt = textBlock.text.slice(0, 200);
+                }
+                break;
+              }
+            } catch {
+              // skip malformed line
+            }
+          }
+
+          entries.push({
+            sessionId,
+            fullPath: filePath,
+            fileMtime: stat.mtimeMs,
+            firstPrompt: firstPrompt || 'Untitled',
+            summary: undefined,
+            messageCount: undefined,
+            created: stat.birthtime.toISOString(),
+            modified: stat.mtime.toISOString(),
+            isSidechain: false,
+          });
+        } catch {
+          // Skip unreadable files
+        }
+      }
+    } catch {
+      // Directory doesn't exist or can't be read
+    }
+
+    // Sort by modified time descending
+    entries.sort((a, b) => (b.fileMtime || 0) - (a.fileMtime || 0));
+    return entries;
   }
 
   getAllSessions(): SessionInfo[] {
@@ -138,8 +206,17 @@ class SessionManager {
     const encoded = encodePath(projectPath);
     const sessionFile = path.join(this.sessionsDir, encoded, `${sessionId}.jsonl`);
 
+    // Try encoded path first, then try projectPath as-is (it might already be encoded dir name)
+    let filePath = sessionFile;
+    if (!fs.existsSync(filePath)) {
+      const altPath = path.join(this.sessionsDir, projectPath, `${sessionId}.jsonl`);
+      if (fs.existsSync(altPath)) {
+        filePath = altPath;
+      }
+    }
+
     try {
-      const content = fs.readFileSync(sessionFile, 'utf-8');
+      const content = fs.readFileSync(filePath, 'utf-8');
       const lines = content.split('\n').filter((line) => line.trim());
       const messages: MessageEntry[] = [];
 
