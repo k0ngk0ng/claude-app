@@ -13,11 +13,14 @@ export function Tooltip({ text, children }: TooltipProps) {
 
   if (!text) return <>{children}</>;
 
-  const handleMouseEnter = (e: React.MouseEvent) => {
-    setPos({
-      x: e.clientX,
-      y: e.clientY - 10,
-    });
+  const handleMouseEnter = () => {
+    if (ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      setPos({
+        x: 8,
+        y: rect.top - 4,
+      });
+    }
     setVisible(true);
   };
 
@@ -35,7 +38,7 @@ export function Tooltip({ text, children }: TooltipProps) {
               position: 'fixed',
               left: pos.x,
               top: pos.y,
-              transform: 'translate(-50%, -100%)',
+              transform: 'translateY(-100%)',
               zIndex: 9999,
             }}
             className="px-2.5 py-1.5 rounded-md bg-[#333] text-text-primary
