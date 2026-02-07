@@ -1,17 +1,22 @@
-import { defineConfig } from 'vite';
+import { defineConfig, mergeConfig } from 'vite';
+import {
+  getBuildConfig,
+  getBuildDefine,
+  external,
+  pluginHotRestart,
+} from '@electron-forge/plugin-vite/dist/config/vite.base.config';
 
-export default defineConfig({
-  build: {
-    outDir: '.vite/build',
-    lib: {
-      entry: 'src/preload/index.ts',
-      formats: ['cjs'],
-      fileName: () => 'preload.js',
+// https://electron.forge.dev/config/plugins/vite
+export default defineConfig((env) => {
+  const forgeEnv = env as any;
+
+  return mergeConfig(getBuildConfig(forgeEnv), {
+    build: {
+      rollupOptions: {
+        external: [...external],
+      },
     },
-    rollupOptions: {
-      external: ['electron'],
-    },
-    minify: false,
-    sourcemap: true,
-  },
+    plugins: [pluginHotRestart('reload')],
+    define: getBuildDefine(forgeEnv),
+  });
 });

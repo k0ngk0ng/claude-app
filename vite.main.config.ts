@@ -1,20 +1,26 @@
-import { defineConfig } from 'vite';
+import { defineConfig, mergeConfig } from 'vite';
+import {
+  getBuildConfig,
+  getBuildDefine,
+  external,
+  pluginHotRestart,
+} from '@electron-forge/plugin-vite/dist/config/vite.base.config';
 
-export default defineConfig({
-  build: {
-    outDir: '.vite/build',
-    lib: {
-      entry: 'src/main/index.ts',
-      formats: ['cjs'],
-      fileName: () => 'main.js',
+// https://electron.forge.dev/config/plugins/vite
+export default defineConfig((env) => {
+  const forgeEnv = env as any;
+
+  return mergeConfig(getBuildConfig(forgeEnv), {
+    build: {
+      rollupOptions: {
+        external: [...external, 'node-pty'],
+      },
     },
-    rollupOptions: {
-      external: ['electron', 'node-pty', 'path', 'fs', 'os', 'child_process', 'events'],
+    plugins: [pluginHotRestart('restart')],
+    define: getBuildDefine(forgeEnv),
+    resolve: {
+      conditions: ['node'],
+      mainFields: ['module', 'jsnext:main', 'jsnext'],
     },
-    minify: false,
-    sourcemap: true,
-  },
-  resolve: {
-    mainFields: ['module', 'jsnext:main', 'jsnext'],
-  },
+  });
 });
