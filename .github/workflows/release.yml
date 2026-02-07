@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -24,6 +26,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Sync version from git tag
+        run: npm run version:sync
 
       - name: Make distributables
         run: npm run make
@@ -45,6 +50,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -54,6 +61,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Sync version from git tag
+        run: npm run version:sync
 
       - name: Make distributables
         run: npm run make
@@ -76,6 +86,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -90,6 +102,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y dpkg fakeroot rpm
+
+      - name: Sync version from git tag
+        run: npm run version:sync
 
       - name: Make distributables
         run: npm run make

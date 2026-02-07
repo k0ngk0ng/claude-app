@@ -1,14 +1,15 @@
 {
   "name": "claude-app",
   "productName": "Claude App",
-  "version": "1.0.0",
+  "version": "0.0.0-dev",
   "description": "Desktop GUI for Claude Code CLI",
   "author": "k0ngk0ng",
   "main": ".vite/build/index.js",
   "scripts": {
     "start": "electron-forge start",
     "package": "electron-forge package",
-    "make": "electron-forge make"
+    "make": "electron-forge make",
+    "version:sync": "node scripts/sync-version.mjs"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.10.0",
