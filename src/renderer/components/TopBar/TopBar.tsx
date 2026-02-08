@@ -74,9 +74,18 @@ export function TopBar() {
         {/* Separator */}
         <div className="w-px h-5 bg-border mx-0.5" />
 
-        {/* Terminal toggle */}
+        {/* Terminal toggle — mutually exclusive with logs */}
         <button
-          onClick={() => togglePanel('terminal')}
+          onClick={() => {
+            if (panels.terminal) {
+              // Currently on → turn off
+              togglePanel('terminal');
+            } else {
+              // Turn on terminal, turn off logs if open
+              togglePanel('terminal');
+              if (panels.logs) togglePanel('logs');
+            }
+          }}
           className={`p-1.5 rounded-md transition-colors ${
             panels.terminal
               ? 'bg-accent-muted text-accent'
@@ -113,16 +122,17 @@ export function TopBar() {
           </svg>
         </button>
 
-        {/* Debug logs toggle — only visible when debug mode is on */}
+        {/* Debug logs toggle — mutually exclusive with terminal */}
         {debugMode && (
           <button
             onClick={() => {
-              // Open bottom panel with logs tab
-              const { panels } = useAppStore.getState();
-              if (!panels.logs) {
+              if (panels.logs) {
+                // Currently on → turn off
                 togglePanel('logs');
               } else {
+                // Turn on logs, turn off terminal if open
                 togglePanel('logs');
+                if (panels.terminal) togglePanel('terminal');
               }
             }}
             className={`p-1.5 rounded-md transition-colors ${

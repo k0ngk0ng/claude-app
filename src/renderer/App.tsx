@@ -84,7 +84,13 @@ export default function App() {
         handleNewThread();
       } else if (mod && e.key === 't') {
         e.preventDefault();
-        togglePanel('terminal');
+        const { panels: p } = useAppStore.getState();
+        if (p.terminal) {
+          togglePanel('terminal');
+        } else {
+          togglePanel('terminal');
+          if (p.logs) togglePanel('logs');
+        }
       } else if (mod && e.key === 'd') {
         e.preventDefault();
         togglePanel('diff');
