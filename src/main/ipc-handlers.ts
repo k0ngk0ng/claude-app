@@ -3,7 +3,7 @@ import { claudeProcessManager } from './claude-process';
 import { sessionManager } from './session-manager';
 import { gitManager } from './git-manager';
 import { terminalManager } from './terminal-manager';
-import { getPlatform, getClaudeModel, checkDependencies } from './platform';
+import { getPlatform, getClaudeModel, checkDependencies, readClaudeConfig, writeClaudeConfig } from './platform';
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
@@ -418,6 +418,16 @@ export function registerIpcHandlers(): void {
     } catch (err: any) {
       return { success: false, installed: [], error: err?.message || String(err) };
     }
+  });
+
+  // ─── Claude Code config (~/.claude/settings.json) ─────────────────
+  ipcMain.handle('claudeConfig:read', () => {
+    return readClaudeConfig();
+  });
+
+  ipcMain.handle('claudeConfig:write', (_event, updates: Record<string, unknown>) => {
+    writeClaudeConfig(updates);
+    return true;
   });
 
   // ─── Git push ─────────────────────────────────────────────────────

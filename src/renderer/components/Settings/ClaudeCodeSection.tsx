@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { SettingsInput } from './controls/SettingsInput';
 import { SettingsSelect } from './controls/SettingsSelect';
@@ -135,13 +135,87 @@ function PasswordInput({
 }
 
 // ─── Main component ─────────────────────────────────────────────────
-export function ProviderSection() {
+export function ClaudeCodeSection() {
   const { settings, updateProvider, setEnvVars, addEnvVar, removeEnvVar, updateEnvVar } = useSettingsStore();
   const { provider } = settings;
   const { envVars } = provider;
   const importRef = useRef<HTMLInputElement>(null);
   const [newCustomKey, setNewCustomKey] = useState('');
   const [newCustomValue, setNewCustomValue] = useState('');
+
+  // ─── Claude Code config (~/.claude/settings.json) bidirectional sync ──
+  const [includeCoAuthoredBy, setIncludeCoAuthoredBy] = useState(false);
+  const [claudeConfigLoaded, setClaudeConfigLoaded] = useState(false);
+  const syncingRef = useRef(false); // prevent write-back during initial load
+
+  // On mount: read ~/.claude/settings.json and merge env vars into store
+  useEffect(() => {
+    syncingRef.current = true;
+    window.api.claudeConfig.read().then((config) => {
+      setIncludeCoAuthoredBy(config.includeCoAuthoredBy === true);
+
+      // Merge env field from settings.json into store envVars
+      const fileEnv = (config.env || {}) as Record<string, string>;
+      const currentVars = useSettingsStore.getState().settings.provider.envVars;
+      const currentKeys = new Set(currentVars.map((v) => v.key));
+
+      let merged = [...currentVars];
+      let changed = false;
+
+      // Update existing keys with file values, add new keys from file
+      for (const [key, value] of Object.entries(fileEnv)) {
+        if (typeof value !== 'string') continue;
+        if (currentKeys.has(key)) {
+          // Update value from file if the store value is empty
+          const existing = merged.find((v) => v.key === key);
+          if (existing && !existing.value && value) {
+            merged = merged.map((v) => v.key === key ? { ...v, value, enabled: true } : v);
+            changed = true;
+          }
+        } else {
+          // New key from file — add as enabled
+          merged.push({ key, value, enabled: true });
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        setEnvVars(merged);
+      }
+
+      setClaudeConfigLoaded(true);
+      // Allow write-back after a tick so the merge doesn't trigger a write
+      setTimeout(() => { syncingRef.current = false; }, 100);
+    }).catch(() => {
+      setClaudeConfigLoaded(true);
+      syncingRef.current = false;
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Write envVars back to ~/.claude/settings.json whenever they change
+  useEffect(() => {
+    if (!claudeConfigLoaded || syncingRef.current) return;
+
+    // Convert envVars to flat Record<string, string> (only enabled with non-empty values)
+    const envRecord: Record<string, string> = {};
+    for (const { key, value, enabled } of envVars) {
+      if (enabled && key && value) {
+        envRecord[key] = value;
+      }
+    }
+
+    window.api.claudeConfig.write({ env: envRecord }).catch(() => {
+      // Silently ignore write errors
+    });
+  }, [envVars, claudeConfigLoaded]);
+
+  const handleCoAuthoredByChange = useCallback((checked: boolean) => {
+    setIncludeCoAuthoredBy(checked);
+    window.api.claudeConfig.write({ includeCoAuthoredBy: checked }).catch(() => {
+      // Revert on failure
+      setIncludeCoAuthoredBy(!checked);
+    });
+  }, []);
 
   // ─── Env var helpers ────────────────────────────────────────────
   const setEnv = useCallback((key: string, value: string) => {
@@ -162,19 +236,31 @@ export function ProviderSection() {
     }
   }, [envVars, updateEnvVar, addEnvVar]);
 
-  // ─── Import / Export ────────────────────────────────────────────
+  // ─── Import / Export (compatible with ~/.claude/settings.json format) ──
   const handleExport = useCallback(() => {
-    const data = JSON.stringify(provider, null, 2);
+    // Build a settings.json-compatible object
+    const envRecord: Record<string, string> = {};
+    for (const { key, value, enabled } of envVars) {
+      if (enabled && key && value) {
+        envRecord[key] = value;
+      }
+    }
+    const exportData: Record<string, unknown> = { env: envRecord };
+    if (includeCoAuthoredBy !== undefined) {
+      exportData.includeCoAuthoredBy = includeCoAuthoredBy;
+    }
+
+    const data = JSON.stringify(exportData, null, 2);
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'claude-provider-settings.json';
+    a.download = 'settings.json';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [provider]);
+  }, [envVars, includeCoAuthoredBy]);
 
   const handleImport = useCallback(() => {
     importRef.current?.click();
@@ -187,20 +273,32 @@ export function ProviderSection() {
     reader.onload = () => {
       try {
         const data = JSON.parse(reader.result as string);
-        if (data.envVars && Array.isArray(data.envVars)) {
+
+        // Support ~/.claude/settings.json format: { env: { KEY: "value" } }
+        if (data.env && typeof data.env === 'object' && !Array.isArray(data.env)) {
+          const newVars: ProviderEnvVar[] = Object.entries(data.env)
+            .filter(([, v]) => typeof v === 'string')
+            .map(([key, value]) => ({ key, value: value as string, enabled: true }));
+          if (newVars.length > 0) {
+            setEnvVars(newVars);
+          }
+        }
+        // Also support legacy format: { envVars: [{ key, value, enabled }] }
+        else if (data.envVars && Array.isArray(data.envVars)) {
           setEnvVars(data.envVars);
         }
-        if (data.defaultModel !== undefined) updateProvider({ defaultModel: data.defaultModel });
-        if (data.maxTokens !== undefined) updateProvider({ maxTokens: data.maxTokens });
-        if (data.temperature !== undefined) updateProvider({ temperature: data.temperature });
-        if (data.systemPrompt !== undefined) updateProvider({ systemPrompt: data.systemPrompt });
+
+        // Import includeCoAuthoredBy if present
+        if (typeof data.includeCoAuthoredBy === 'boolean') {
+          handleCoAuthoredByChange(data.includeCoAuthoredBy);
+        }
       } catch {
         // Invalid JSON — ignore
       }
     };
     reader.readAsText(file);
     e.target.value = '';
-  }, [setEnvVars, updateProvider]);
+  }, [setEnvVars, handleCoAuthoredByChange]);
 
   // Custom env vars (not in predefined list)
   const customEnvVars = envVars.filter((v) => !PREDEFINED_KEYS.has(v.key));
@@ -217,7 +315,7 @@ export function ProviderSection() {
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <h2 className="text-lg font-semibold text-text-primary">Provider</h2>
+        <h2 className="text-lg font-semibold text-text-primary">Claude Code</h2>
         <div className="flex items-center gap-2">
           <button
             onClick={handleImport}
@@ -237,7 +335,7 @@ export function ProviderSection() {
         </div>
       </div>
       <p className="text-sm text-text-muted mb-6">
-        Configure provider, model, and environment settings for Claude.
+        Configure Claude Code model, environment, and runtime settings.
       </p>
 
       <div className="space-y-4">
@@ -443,6 +541,13 @@ export function ProviderSection() {
 
         {/* ── Advanced ───────────────────────────────────────────── */}
         <CollapsibleSection title="Advanced">
+          <SettingsToggle
+            label="Include Co-Authored-By"
+            description="Add a 'Co-Authored-By: Claude' trailer to git commits made during Claude sessions. Saved to ~/.claude/settings.json."
+            checked={includeCoAuthoredBy}
+            onChange={handleCoAuthoredByChange}
+            disabled={!claudeConfigLoaded}
+          />
           <SettingsTextarea
             label="Custom system prompt"
             description="Additional instructions prepended to every conversation. Leave empty to use the default."

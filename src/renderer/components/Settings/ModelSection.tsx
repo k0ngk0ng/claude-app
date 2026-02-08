@@ -1,4 +1,4 @@
-// This file is deprecated — use ProviderSection.tsx instead.
+// This file is deprecated — use ClaudeCodeSection.tsx instead.
 // Kept for reference only.
 
 import React from 'react';
@@ -7,7 +7,7 @@ import { SettingsInput } from './controls/SettingsInput';
 import { SettingsSelect } from './controls/SettingsSelect';
 import { SettingsTextarea } from './controls/SettingsTextarea';
 
-/** @deprecated Use ProviderSection instead */
+/** @deprecated Use ClaudeCodeSection instead */
 export function ModelSection() {
   const { settings, updateProvider } = useSettingsStore();
   const { provider } = settings;

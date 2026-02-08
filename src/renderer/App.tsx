@@ -17,9 +17,30 @@ export default function App() {
   const [depsReady, setDepsReady] = useState(false);
   const { panels, togglePanel, setCurrentProject, setPlatform, currentProject } =
     useAppStore();
-  const { isOpen: settingsOpen, openSettings, closeSettings } = useSettingsStore();
+  const { isOpen: settingsOpen, openSettings, closeSettings, settings } = useSettingsStore();
   const { loadSessions } = useSessions();
   const { startSession, sendMessage, stopSession, isStreaming } = useClaude();
+
+  // ─── Theme switching ──────────────────────────────────────────────
+  useEffect(() => {
+    const theme = settings.appearance.theme;
+    const html = document.documentElement;
+
+    function applyTheme(mode: 'dark' | 'light') {
+      html.classList.remove('dark', 'light');
+      html.classList.add(mode);
+    }
+
+    if (theme === 'system') {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      applyTheme(mq.matches ? 'dark' : 'light');
+      const handler = (e: MediaQueryListEvent) => applyTheme(e.matches ? 'dark' : 'light');
+      mq.addEventListener('change', handler);
+      return () => mq.removeEventListener('change', handler);
+    } else {
+      applyTheme(theme);
+    }
+  }, [settings.appearance.theme]);
 
   // Initialize app
   useEffect(() => {

@@ -67,12 +67,18 @@ export interface AppAPI {
   toggleDevTools: () => Promise<void>;
 }
 
+export interface ClaudeConfigAPI {
+  read: () => Promise<Record<string, unknown>>;
+  write: (updates: Record<string, unknown>) => Promise<boolean>;
+}
+
 export interface WindowAPI {
   claude: ClaudeAPI;
   sessions: SessionsAPI;
   git: GitAPI;
   terminal: TerminalAPI;
   app: AppAPI;
+  claudeConfig: ClaudeConfigAPI;
 }
 
 export interface DependencyStatus {
@@ -189,7 +195,7 @@ export interface ClaudeStreamEvent {
 
 export type SettingsTab =
   | 'general'
-  | 'provider'
+  | 'claude-code'
   | 'permissions'
   | 'mcp-servers'
   | 'git'

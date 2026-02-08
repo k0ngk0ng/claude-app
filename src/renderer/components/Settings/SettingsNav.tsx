@@ -24,17 +24,13 @@ const navItems: NavItem[] = [
     ),
   },
   {
-    id: 'provider',
-    label: 'Provider',
+    id: 'claude-code',
+    label: 'Claude Code',
     icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-        <path
-          d="M4 11.5a3.5 3.5 0 01-.5-6.96A4.5 4.5 0 018 1.5a4.5 4.5 0 014.5 3.04A3.5 3.5 0 0112 11.5H4z"
-          stroke="currentColor"
-          strokeWidth="1.3"
-          strokeLinejoin="round"
-        />
-        <path d="M6 14h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+        <rect x="1.5" y="2.5" width="13" height="11" rx="2" stroke="currentColor" strokeWidth="1.3" />
+        <path d="M4.5 6l2 1.5-2 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M8 10h3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
       </svg>
     ),
   },

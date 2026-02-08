@@ -95,6 +95,44 @@ export function getClaudeModel(): string {
   return 'claude-sonnet-4-20250514';
 }
 
+// ─── Claude Code settings.json read/write ────────────────────────────
+
+/**
+ * Get the path to ~/.claude/settings.json
+ */
+export function getClaudeSettingsPath(): string {
+  const configDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
+  return path.join(configDir, 'settings.json');
+}
+
+/**
+ * Read the entire ~/.claude/settings.json as a plain object.
+ * Returns {} if the file doesn't exist or is invalid.
+ */
+export function readClaudeConfig(): Record<string, unknown> {
+  try {
+    const content = fs.readFileSync(getClaudeSettingsPath(), 'utf-8');
+    return JSON.parse(content);
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Write a partial update to ~/.claude/settings.json (shallow merge at top level).
+ * Creates the file (and parent directory) if it doesn't exist.
+ */
+export function writeClaudeConfig(updates: Record<string, unknown>): void {
+  const settingsPath = getClaudeSettingsPath();
+  const dir = path.dirname(settingsPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  const existing = readClaudeConfig();
+  const merged = { ...existing, ...updates };
+  fs.writeFileSync(settingsPath, JSON.stringify(merged, null, 2) + '\n', 'utf-8');
+}
+
 export interface DependencyStatus {
   name: string;
   found: boolean;

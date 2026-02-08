@@ -56,6 +56,11 @@ export interface TerminalAPI {
   removeDataListener: (callback: (id: string, data: string) => void) => void;
 }
 
+export interface ClaudeConfigAPI {
+  read: () => Promise<Record<string, unknown>>;
+  write: (updates: Record<string, unknown>) => Promise<boolean>;
+}
+
 export interface AppAPI {
   getProjectPath: () => Promise<string>;
   selectDirectory: () => Promise<string | null>;
@@ -226,4 +231,9 @@ contextBridge.exposeInMainWorld('api', {
     },
     toggleDevTools: () => ipcRenderer.invoke('app:toggleDevTools'),
   } satisfies AppAPI,
+
+  claudeConfig: {
+    read: () => ipcRenderer.invoke('claudeConfig:read'),
+    write: (updates: Record<string, unknown>) => ipcRenderer.invoke('claudeConfig:write', updates),
+  } satisfies ClaudeConfigAPI,
 });

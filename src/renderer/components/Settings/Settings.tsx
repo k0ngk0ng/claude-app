@@ -3,7 +3,7 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { useAppStore } from '../../stores/appStore';
 import { SettingsNav } from './SettingsNav';
 import { GeneralSection } from './GeneralSection';
-import { ProviderSection } from './ProviderSection';
+import { ClaudeCodeSection } from './ClaudeCodeSection';
 import { PermissionsSection } from './PermissionsSection';
 import { McpServersSection } from './McpServersSection';
 import { GitSection } from './GitSection';
@@ -19,8 +19,8 @@ export function Settings() {
     switch (activeTab) {
       case 'general':
         return <GeneralSection />;
-      case 'provider':
-        return <ProviderSection />;
+      case 'claude-code':
+        return <ClaudeCodeSection />;
       case 'permissions':
         return <PermissionsSection />;
       case 'mcp-servers':

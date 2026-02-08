@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+/* ─── Dark theme (default) ─────────────────────────────────────────── */
 @theme {
   --color-bg: #1a1a1a;
   --color-sidebar: #141414;
@@ -22,6 +23,29 @@
   --color-assistant-bubble: #1e1e1e;
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", Menlo, Courier, monospace;
+}
+
+/* ─── Light theme overrides ────────────────────────────────────────── */
+html.light {
+  --color-bg: #f5f5f5;
+  --color-sidebar: #eaeaea;
+  --color-surface: #ffffff;
+  --color-surface-hover: #f0f0f0;
+  --color-surface-active: #e5e5e5;
+  --color-accent: #d4691a;
+  --color-accent-hover: #c05e15;
+  --color-accent-muted: rgba(212, 105, 26, 0.12);
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #555555;
+  --color-text-muted: #888888;
+  --color-border: #d4d4d4;
+  --color-border-light: #e0e0e0;
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
+  --color-user-bubble: #fff3eb;
+  --color-assistant-bubble: #f9f9f9;
 }
 
 * {
@@ -52,12 +76,12 @@ html, body, #root {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #3a3a3a;
+  background: var(--color-surface-active);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #4a4a4a;
+  background: var(--color-text-muted);
 }
 
 /* Draggable region for frameless window */
@@ -87,7 +111,7 @@ html, body, #root {
 }
 
 .markdown-content pre {
-  background: #1a1a1a;
+  background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: 6px;
   padding: 12px;
@@ -103,7 +127,7 @@ html, body, #root {
 }
 
 .markdown-content :not(pre) > code {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--color-surface-active);
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 0.9em;
