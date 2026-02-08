@@ -62,13 +62,21 @@ const defaultSettings: AppSettings = {
   ],
 };
 
+function saveSettings(settings: AppSettings) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 function loadSettings(): AppSettings {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored);
       // Deep merge with defaults to handle new settings added in updates
-      return {
+      const settings: AppSettings = {
         general: { ...defaultSettings.general, ...parsed.general },
         model: { ...defaultSettings.model, ...parsed.model },
         permissions: { ...defaultSettings.permissions, ...parsed.permissions },
@@ -77,19 +85,26 @@ function loadSettings(): AppSettings {
         appearance: { ...defaultSettings.appearance, ...parsed.appearance },
         keybindings: parsed.keybindings?.length ? parsed.keybindings : defaultSettings.keybindings,
       };
+
+      // Migrate old autoApprove values to new permission mode values
+      const modeMap: Record<string, string> = {
+        'suggest': 'default',
+        'auto-edit': 'acceptEdits',
+        'full-auto': 'bypassPermissions',
+      };
+      const validModes = ['default', 'acceptEdits', 'plan', 'bypassPermissions', 'dontAsk'];
+      if (!validModes.includes(settings.general.autoApprove)) {
+        settings.general.autoApprove = (modeMap[settings.general.autoApprove] || 'default') as any;
+        // Persist the migration
+        saveSettings(settings);
+      }
+
+      return settings;
     }
   } catch {
     // Ignore parse errors
   }
   return { ...defaultSettings };
-}
-
-function saveSettings(settings: AppSettings) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  } catch {
-    // Ignore storage errors
-  }
 }
 
 interface SettingsStore {
