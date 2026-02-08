@@ -86,6 +86,7 @@ const config: ForgeConfig = {
   makers: [
     new MakerDMG({
       format: 'ULFO',
+      icon: './assets/icon.icns',
     }),
     new MakerSquirrel({
       name: 'claude-app',
