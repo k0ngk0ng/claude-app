@@ -143,7 +143,9 @@ export function useClaude() {
                   useAppStore.setState({ toolActivities: stillRunning });
                 }
               }
-              streamingTextRef.current = '';
+              // Do NOT clear streamingTextRef here — text should accumulate
+              // across turns so the user sees a continuous response.
+              // Only clear on sendMessage (new user message) or result (final).
               currentModelRef.current = evt.message?.model || currentModelRef.current;
               currentToolIdRef.current = null;
               toolInputJsonRef.current = '';
@@ -185,6 +187,13 @@ export function useClaude() {
                     status: 'running',
                     timestamp: Date.now(),
                   });
+                }
+              } else if (evt.content_block?.type === 'text') {
+                // New text block starting — if we already have text from a previous
+                // turn, add a separator so content doesn't run together
+                if (streamingTextRef.current && !streamingTextRef.current.endsWith('\n')) {
+                  streamingTextRef.current += '\n\n';
+                  setStreamingContent(streamingTextRef.current);
                 }
               }
               break;
