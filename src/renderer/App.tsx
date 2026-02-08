@@ -126,13 +126,13 @@ export default function App() {
   }, [stopSession, currentProject.path]);
 
   const handleSendMessage = useCallback(
-    async (content: string) => {
+    async (content: string, permissionMode?: string) => {
       const state = useAppStore.getState();
       const projectPath = state.currentSession.projectPath || currentProject.path;
 
       // Start a new process if we don't have one
       if (!state.currentSession.processId) {
-        await startSession(projectPath, state.currentSession.id || undefined);
+        await startSession(projectPath, state.currentSession.id || undefined, permissionMode);
       }
 
       await sendMessage(content);

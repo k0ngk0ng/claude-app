@@ -45,7 +45,7 @@ class ClaudeProcessManager extends EventEmitter {
   private processes: Map<string, ManagedProcess> = new Map();
   private isWindows = process.platform === 'win32';
 
-  spawn(cwd: string, sessionId?: string): string {
+  spawn(cwd: string, sessionId?: string, permissionMode?: string): string {
     const processId = randomUUID();
     const claudeBinary = getClaudeBinary();
 
@@ -56,6 +56,11 @@ class ClaudeProcessManager extends EventEmitter {
       '--verbose',
       '--include-partial-messages',
     ];
+
+    // Add permission mode (default, acceptEdits, plan, bypassPermissions, dontAsk)
+    if (permissionMode && permissionMode !== 'default') {
+      args.push('--permission-mode', permissionMode);
+    }
 
     if (sessionId) {
       args.push('--resume', sessionId);

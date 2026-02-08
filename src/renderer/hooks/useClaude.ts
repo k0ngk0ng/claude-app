@@ -492,11 +492,13 @@ export function useClaude() {
   }, []);
 
   const startSession = useCallback(
-    async (cwd: string, sessionId?: string) => {
-      debugLog('claude', `spawning CLI — cwd: ${cwd}${sessionId ? ', resume: ' + sessionId : ''}`, {
+    async (cwd: string, sessionId?: string, permissionMode?: string) => {
+      const mode = permissionMode || 'default';
+      debugLog('claude', `spawning CLI — cwd: ${cwd}${sessionId ? ', resume: ' + sessionId : ''}, mode: ${mode}`, {
         cwd,
         sessionId,
-        args: ['--print', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', ...(sessionId ? ['--resume', sessionId] : [])],
+        permissionMode: mode,
+        args: ['--print', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--permission-mode', mode, ...(sessionId ? ['--resume', sessionId] : [])],
       });
 
       if (processIdRef.current) {
@@ -508,7 +510,7 @@ export function useClaude() {
       currentModelRef.current = undefined;
       lastResultIdRef.current = null;
 
-      const pid = await window.api.claude.spawn(cwd, sessionId);
+      const pid = await window.api.claude.spawn(cwd, sessionId, mode);
       processIdRef.current = pid;
       useAppStore.getState().setProcessId(pid);
       useAppStore.getState().setIsStreaming(false);

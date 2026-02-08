@@ -1,7 +1,7 @@
 // ─── API types exposed via preload ──────────────────────────────────
 
 export interface ClaudeAPI {
-  spawn: (cwd: string, sessionId?: string) => Promise<string>;
+  spawn: (cwd: string, sessionId?: string, permissionMode?: string) => Promise<string>;
   send: (processId: string, content: string) => Promise<boolean>;
   kill: (processId: string) => Promise<boolean>;
   onMessage: (callback: (processId: string, message: ClaudeStreamEvent) => void) => void;
@@ -182,12 +182,13 @@ export type SettingsTab =
   | 'keybindings';
 
 export type ThemeMode = 'dark' | 'light' | 'system';
-export type AutoApproveLevel = 'suggest' | 'auto-edit' | 'full-auto';
+export type PermissionMode = 'default' | 'acceptEdits' | 'plan' | 'bypassPermissions' | 'dontAsk';
+export type AutoApproveLevel = PermissionMode; // backward compat alias
 export type SendKeyMode = 'enter' | 'cmd-enter';
 
 export interface GeneralSettings {
   sendKey: SendKeyMode;
-  autoApprove: AutoApproveLevel;
+  autoApprove: PermissionMode;
   showCostInfo: boolean;
   notifyOnComplete: boolean;
   preventSleep: boolean;

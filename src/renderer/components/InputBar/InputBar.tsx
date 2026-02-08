@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAppStore } from '../../stores/appStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { FileSearchPopup } from './FileSearchPopup';
 
 interface Attachment {
@@ -9,26 +10,27 @@ interface Attachment {
   preview?: string; // data URL for image preview
 }
 
-type ClaudeMode = 'ask' | 'auto-edit' | 'full-auto' | 'plan';
+type ClaudeMode = 'default' | 'acceptEdits' | 'plan' | 'bypassPermissions';
 
 const MODE_OPTIONS: { value: ClaudeMode; label: string; description: string }[] = [
-  { value: 'ask', label: 'Ask before edits', description: 'Claude asks permission before making changes' },
-  { value: 'auto-edit', label: 'Edit automatically', description: 'Claude edits files without asking' },
-  { value: 'full-auto', label: 'Bypass permissions', description: 'Full autonomy, no permission prompts' },
-  { value: 'plan', label: 'Plan mode', description: 'Claude creates a plan before executing' },
+  { value: 'default', label: 'Default', description: 'Prompts for permission on first use of each tool' },
+  { value: 'acceptEdits', label: 'Accept edits', description: 'Auto-approve file edits, ask for bash' },
+  { value: 'plan', label: 'Plan mode', description: 'Analyze only — no file modifications or commands' },
+  { value: 'bypassPermissions', label: 'Bypass permissions', description: 'Full autonomy, skip all permission prompts' },
 ];
 
 interface InputBarProps {
-  onSend: (content: string) => void;
+  onSend: (content: string, permissionMode: string) => void;
   isStreaming: boolean;
   onStop: () => void;
 }
 
 export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
   const { currentProject, setBranch } = useAppStore();
+  const defaultMode = useSettingsStore(s => s.settings.general.autoApprove) as ClaudeMode;
   const [value, setValue] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [mode, setMode] = useState<ClaudeMode>('ask');
+  const [mode, setMode] = useState<ClaudeMode>(defaultMode || 'default');
   const [modeOpen, setModeOpen] = useState(false);
   const [modelName, setModelName] = useState('');
   const [branchOpen, setBranchOpen] = useState(false);
@@ -278,7 +280,7 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
         : `[Attached files:\n${filePaths}]`;
     }
 
-    onSend(message);
+    onSend(message, mode);
     setValue('');
     setAttachments([]);
     if (textareaRef.current) {
@@ -439,20 +441,20 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
                            transition-colors"
                 title={currentMode.description}
               >
-                {mode === 'ask' && (
+                {mode === 'default' && (
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                     <path d="M8 14A6 6 0 108 2a6 6 0 000 12z" stroke="currentColor" strokeWidth="1.2" />
                     <path d="M6.5 6a1.5 1.5 0 113 0c0 .83-.68 1.1-1.5 1.5V9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
                     <circle cx="8" cy="11" r="0.75" fill="currentColor" />
                   </svg>
                 )}
-                {mode === 'auto-edit' && (
+                {mode === 'acceptEdits' && (
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                     <path d="M11.5 1.5l3 3-9 9H2.5v-3l9-9z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
                     <path d="M9.5 3.5l3 3" stroke="currentColor" strokeWidth="1.2" />
                   </svg>
                 )}
-                {mode === 'full-auto' && (
+                {mode === 'bypassPermissions' && (
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                     <path d="M8 1l2 4.5L15 7l-5 1.5L8 13l-2-4.5L1 7l5-1.5L8 1z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
                   </svg>

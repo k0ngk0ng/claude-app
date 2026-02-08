@@ -16,7 +16,7 @@ const STORAGE_KEY = 'claude-app-settings';
 const defaultSettings: AppSettings = {
   general: {
     sendKey: 'enter',
-    autoApprove: 'suggest',
+    autoApprove: 'default',
     showCostInfo: true,
     notifyOnComplete: true,
     preventSleep: false,

@@ -27,16 +27,18 @@ export function GeneralSection() {
           ]}
         />
 
-        {/* Auto-approve level */}
+        {/* Permission mode */}
         <SettingsSelect
-          label="Autonomy level"
-          description="Control how much Claude can do without asking for permission."
+          label="Permission mode"
+          description="Control how Claude handles tool permissions. This sets the default for new sessions."
           value={general.autoApprove}
-          onChange={(v) => updateGeneral({ autoApprove: v as 'suggest' | 'auto-edit' | 'full-auto' })}
+          onChange={(v) => updateGeneral({ autoApprove: v as any })}
           options={[
-            { value: 'suggest', label: 'Suggest — Ask before every action' },
-            { value: 'auto-edit', label: 'Auto-edit — Auto-approve file edits' },
-            { value: 'full-auto', label: 'Full auto — Auto-approve all actions' },
+            { value: 'default', label: 'Default — Prompts for permission on first use' },
+            { value: 'acceptEdits', label: 'Accept edits — Auto-approve file edits' },
+            { value: 'plan', label: 'Plan mode — Analyze only, no modifications' },
+            { value: 'dontAsk', label: "Don't ask — Auto-deny unless pre-approved" },
+            { value: 'bypassPermissions', label: 'Bypass permissions — Skip all prompts (⚠️ unsafe)' },
           ]}
         />
 
