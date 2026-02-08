@@ -1,7 +1,16 @@
-import { spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
-import { getClaudeBinary } from './platform';
 import { randomUUID } from 'crypto';
+
+// Dynamic import for ESM module
+let queryFn: typeof import('@anthropic-ai/claude-agent-sdk').query | null = null;
+
+async function getQuery() {
+  if (!queryFn) {
+    const sdk = await import('@anthropic-ai/claude-agent-sdk');
+    queryFn = sdk.query;
+  }
+  return queryFn;
+}
 
 export interface ClaudeMessage {
   type: string;
@@ -34,119 +43,186 @@ export interface ContentBlock {
   tool_use_id?: string;
 }
 
-interface ManagedProcess {
-  process: ChildProcess;
+export interface PermissionRequest {
+  processId: string;
+  requestId: string;
+  toolName: string;
+  input: Record<string, unknown>;
+}
+
+interface ManagedSession {
   cwd: string;
   sessionId?: string;
-  buffer: string;
+  abortController: AbortController;
+  permissionResolvers: Map<string, (result: PermissionResponse) => void>;
+}
+
+export interface PermissionResponse {
+  behavior: 'allow' | 'deny';
+  updatedInput?: Record<string, unknown>;
+  message?: string;
 }
 
 class ClaudeProcessManager extends EventEmitter {
-  private processes: Map<string, ManagedProcess> = new Map();
-  private isWindows = process.platform === 'win32';
+  private sessions: Map<string, ManagedSession> = new Map();
 
-  spawn(cwd: string, sessionId?: string, permissionMode?: string, allowedTools?: string[]): string {
+  async spawn(
+    cwd: string,
+    sessionId?: string,
+    permissionMode?: string,
+  ): Promise<string> {
     const processId = randomUUID();
-    const claudeBinary = getClaudeBinary();
+    const abortController = new AbortController();
 
-    const args = [
-      '--print',
-      '--input-format', 'stream-json',
-      '--output-format', 'stream-json',
-      '--verbose',
-      '--include-partial-messages',
-    ];
-
-    // Add permission mode (default, acceptEdits, plan, bypassPermissions, dontAsk)
-    if (permissionMode && permissionMode !== 'default') {
-      args.push('--permission-mode', permissionMode);
-    }
-
-    // Add allowed tool patterns (e.g. "Bash(git add *)", "Bash(git commit *)")
-    if (allowedTools && allowedTools.length > 0) {
-      args.push('--allowedTools', ...allowedTools);
-    }
-
-    if (sessionId) {
-      args.push('--resume', sessionId);
-    }
-
-    const child = spawn(claudeBinary, args, {
-      cwd,
-      env: {
-        ...process.env,
-        FORCE_COLOR: '0',
-      },
-      stdio: ['pipe', 'pipe', 'pipe'],
-      // On Windows, .cmd/.bat files require shell: true to execute
-      ...(this.isWindows ? { shell: true } : {}),
-    });
-
-    const managed: ManagedProcess = {
-      process: child,
+    const managed: ManagedSession = {
       cwd,
       sessionId,
-      buffer: '',
+      abortController,
+      permissionResolvers: new Map(),
     };
+    this.sessions.set(processId, managed);
 
-    this.processes.set(processId, managed);
-
-    child.stdout?.on('data', (data: Buffer) => {
-      managed.buffer += data.toString('utf-8');
-      const lines = managed.buffer.split('\n');
-      // Keep the last incomplete line in the buffer
-      managed.buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-        try {
-          const parsed: ClaudeMessage = JSON.parse(trimmed);
-          this.emit('message', processId, parsed);
-        } catch {
-          // Non-JSON output, emit as raw
-          this.emit('message', processId, {
-            type: 'raw',
-            message: { role: 'system', content: trimmed },
-          });
-        }
-      }
-    });
-
-    child.stderr?.on('data', (data: Buffer) => {
-      const text = data.toString('utf-8').trim();
-      if (!text) return;
-
-      // Filter out harmless macOS system noise
-      const isNoise = /IMKCFRunLoop|IMKInputSession|NSBundle|CFBundle|IME|InputMethod/i.test(text);
-      if (isNoise) return;
-
-      this.emit('message', processId, {
-        type: 'error',
-        message: { role: 'system', content: text },
-      });
-    });
-
-    child.on('exit', (code, signal) => {
-      this.emit('exit', processId, code, signal);
-      this.processes.delete(processId);
-    });
-
-    child.on('error', (err) => {
-      this.emit('error', processId, err.message);
-      this.processes.delete(processId);
+    // Start the SDK query in background
+    this._runQuery(processId, managed, permissionMode).catch((err) => {
+      this.emit('error', processId, err?.message || String(err));
     });
 
     return processId;
   }
 
-  sendMessage(processId: string, content: string): boolean {
-    const managed = this.processes.get(processId);
-    if (!managed || !managed.process.stdin?.writable) {
-      return false;
+  private async _runQuery(
+    processId: string,
+    managed: ManagedSession,
+    permissionMode?: string,
+  ) {
+    const query = await getQuery();
+
+    // Build options
+    const options: Record<string, unknown> = {
+      cwd: managed.cwd,
+      abortController: managed.abortController,
+      includePartialMessages: true,
+      settingSources: ['user', 'project', 'local'],
+      systemPrompt: { type: 'preset', preset: 'claude_code' },
+    };
+
+    // Permission mode
+    if (permissionMode && permissionMode !== 'default') {
+      options.permissionMode = permissionMode;
     }
 
-    const message = JSON.stringify({
+    // Resume session
+    if (managed.sessionId) {
+      options.resume = managed.sessionId;
+    }
+
+    // canUseTool callback — bridges permission requests to renderer
+    options.canUseTool = async (
+      toolName: string,
+      input: Record<string, unknown>,
+      _opts: { signal: AbortSignal },
+    ) => {
+      const requestId = randomUUID();
+
+      // Emit permission request to renderer
+      this.emit('permission-request', processId, {
+        requestId,
+        toolName,
+        input,
+      } as PermissionRequest);
+
+      // Wait for response from renderer
+      return new Promise<{ behavior: string; updatedInput?: unknown; message?: string }>((resolve) => {
+        managed.permissionResolvers.set(requestId, (response: PermissionResponse) => {
+          managed.permissionResolvers.delete(requestId);
+          if (response.behavior === 'allow') {
+            resolve({
+              behavior: 'allow',
+              updatedInput: response.updatedInput || input,
+            });
+          } else {
+            resolve({
+              behavior: 'deny',
+              message: response.message || 'User denied this action',
+            });
+          }
+        });
+      });
+    };
+
+    // Create streaming input for multi-turn conversation
+    const inputQueue: Array<{
+      type: string;
+      message: { role: string; content: string };
+    }> = [];
+    let inputResolve: (() => void) | null = null;
+    let inputDone = false;
+
+    // Store the input queue on the managed session for sendMessage
+    (managed as any)._inputQueue = inputQueue;
+    (managed as any)._inputResolve = () => inputResolve?.();
+    (managed as any)._setInputResolve = (fn: () => void) => { inputResolve = fn; };
+    (managed as any)._inputDone = () => inputDone;
+    (managed as any)._setInputDone = (v: boolean) => { inputDone = v; };
+
+    // Async generator for streaming input
+    async function* streamInput() {
+      while (!inputDone) {
+        if (inputQueue.length > 0) {
+          yield inputQueue.shift()!;
+        } else {
+          // Wait for new input
+          await new Promise<void>((resolve) => {
+            inputResolve = resolve;
+            (managed as any)._inputResolve = () => resolve();
+          });
+        }
+      }
+    }
+
+    try {
+      const queryIterator = query({
+        prompt: streamInput() as any,
+        options: options as any,
+      });
+
+      for await (const message of queryIterator) {
+        // Forward SDK messages to renderer (same format as stream-json)
+        this.emit('message', processId, message);
+
+        // Track session ID
+        if (message.type === 'system' && (message as any).subtype === 'init') {
+          managed.sessionId = (message as any).session_id;
+        }
+
+        // Check if result
+        if (message.type === 'result') {
+          break;
+        }
+      }
+
+      // Clean exit
+      this.emit('exit', processId, 0, null);
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        this.emit('exit', processId, 0, 'SIGTERM');
+      } else {
+        this.emit('error', processId, err?.message || String(err));
+        this.emit('exit', processId, 1, null);
+      }
+    } finally {
+      this.sessions.delete(processId);
+    }
+  }
+
+  sendMessage(processId: string, content: string): boolean {
+    const managed = this.sessions.get(processId);
+    if (!managed) return false;
+
+    const queue = (managed as any)._inputQueue as Array<any>;
+    if (!queue) return false;
+
+    queue.push({
       type: 'user',
       message: {
         role: 'user',
@@ -154,56 +230,59 @@ class ClaudeProcessManager extends EventEmitter {
       },
     });
 
-    managed.process.stdin.write(message + '\n');
+    // Wake up the input generator
+    const resolve = (managed as any)._inputResolve;
+    if (typeof resolve === 'function') {
+      resolve();
+    }
+
+    return true;
+  }
+
+  respondToPermission(processId: string, requestId: string, response: PermissionResponse): boolean {
+    const managed = this.sessions.get(processId);
+    if (!managed) return false;
+
+    const resolver = managed.permissionResolvers.get(requestId);
+    if (!resolver) return false;
+
+    resolver(response);
     return true;
   }
 
   kill(processId: string): boolean {
-    const managed = this.processes.get(processId);
+    const managed = this.sessions.get(processId);
     if (!managed) return false;
 
-    if (this.isWindows) {
-      // Windows doesn't support POSIX signals; use taskkill for tree kill
-      const pid = managed.process.pid;
-      if (pid) {
-        try {
-          spawn('taskkill', ['/pid', pid.toString(), '/T', '/F'], { shell: true });
-        } catch {
-          // Fallback: just kill the direct process
-          managed.process.kill();
-        }
-      } else {
-        managed.process.kill();
-      }
-    } else {
-      managed.process.kill('SIGTERM');
+    // Signal input stream to stop
+    (managed as any)._setInputDone?.(true);
+    (managed as any)._inputResolve?.();
 
-      // Force kill after 5 seconds
-      setTimeout(() => {
-        try {
-          managed.process.kill('SIGKILL');
-        } catch {
-          // Process already dead
-        }
-      }, 5000);
+    // Abort the query
+    managed.abortController.abort();
+
+    // Resolve any pending permission requests
+    for (const [, resolver] of managed.permissionResolvers) {
+      resolver({ behavior: 'deny', message: 'Session terminated' });
     }
+    managed.permissionResolvers.clear();
 
-    this.processes.delete(processId);
+    this.sessions.delete(processId);
     return true;
   }
 
   killAll(): void {
-    for (const [id] of this.processes) {
+    for (const [id] of this.sessions) {
       this.kill(id);
     }
   }
 
   isRunning(processId: string): boolean {
-    return this.processes.has(processId);
+    return this.sessions.has(processId);
   }
 
   getProcessInfo(processId: string): { cwd: string; sessionId?: string } | null {
-    const managed = this.processes.get(processId);
+    const managed = this.sessions.get(processId);
     if (!managed) return null;
     return { cwd: managed.cwd, sessionId: managed.sessionId };
   }

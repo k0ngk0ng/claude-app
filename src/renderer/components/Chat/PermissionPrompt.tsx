@@ -66,13 +66,13 @@ export function PermissionPrompt({ request }: PermissionPromptProps) {
         {/* Pattern info */}
         {isPending && (
           <div className="text-[11px] text-text-muted mb-2.5">
-            Approving will allow <code className="px-1 py-0.5 bg-surface rounded text-accent text-[10px]">{request.toolPattern}</code> for this and future sessions.
+            Claude is waiting for your approval to proceed.
           </div>
         )}
 
         {isApproved && (
           <div className="text-[11px] text-green-400/80 mb-1">
-            ✓ Allowed <code className="px-1 py-0.5 bg-surface rounded text-[10px]">{request.toolPattern}</code> — retrying with updated permissions…
+            ✓ Approved — executing…
           </div>
         )}
 

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useAppStore, type ToolActivity } from '../stores/appStore';
-import { usePermissionStore, extractToolPattern } from '../stores/permissionStore';
+import { usePermissionStore } from '../stores/permissionStore';
 import { debugLog } from '../stores/debugLogStore';
-import type { ContentBlock, Message, ToolUseInfo } from '../types';
+import type { ContentBlock, Message, ToolUseInfo, PermissionRequestEvent } from '../types';
 
 /**
  * Claude CLI stream-json protocol events:
@@ -403,61 +403,6 @@ export function useClaude() {
                     .join('\n');
                 }
 
-                // Detect permission denial
-                const isPermissionDenied = block.is_error &&
-                  (resultContent.includes('requires approval') ||
-                   resultContent.includes('require approval') ||
-                   resultContent.includes('permission'));
-
-                if (isPermissionDenied) {
-                  // Find the tool activity to get name and command
-                  const { toolActivities } = useAppStore.getState();
-                  const activity = toolActivities.find(a => a.id === block.tool_use_id);
-                  const toolName = activity?.name || 'Bash';
-
-                  // Extract command from the tool's input
-                  let command = '';
-                  if (activity?.inputFull) {
-                    try {
-                      const parsed = JSON.parse(activity.inputFull);
-                      command = parsed.command || parsed.file_path || JSON.stringify(parsed);
-                    } catch {
-                      command = activity.inputFull;
-                    }
-                  }
-                  // Fallback: extract command from the error message itself
-                  if (!command) {
-                    command = resultContent;
-                  }
-
-                  const pattern = extractToolPattern(toolName, command);
-                  debugLog('claude', `permission denied: ${toolName} — ${command.slice(0, 100)}`, {
-                    toolId: block.tool_use_id,
-                    toolName,
-                    command,
-                    pattern,
-                    error: resultContent,
-                  }, 'warn');
-
-                  // Check if this pattern is already allowed (shouldn't happen, but just in case)
-                  const { allowedTools, pendingRequests, addRequest } = usePermissionStore.getState();
-                  const alreadyAllowed = allowedTools.includes(pattern);
-                  const alreadyPending = pendingRequests.some(
-                    r => r.toolPattern === pattern && r.status === 'pending'
-                  );
-
-                  if (!alreadyAllowed && !alreadyPending) {
-                    addRequest({
-                      id: `perm-${Date.now()}-${block.tool_use_id}`,
-                      toolName,
-                      command,
-                      toolPattern: pattern,
-                      timestamp: Date.now(),
-                      status: 'pending',
-                    });
-                  }
-                }
-
                 // Truncate long results for display
                 const truncated = resultContent.length > 500
                   ? resultContent.slice(0, 500) + '\n…(truncated)'
@@ -653,81 +598,55 @@ export function useClaude() {
     };
   }, []);
 
-  // Listen for permission approvals — re-spawn the CLI with updated --allowedTools
-  // and ask Claude to retry the denied command.
-  // Debounced: if multiple approvals come in quickly (e.g. "Allow All"), only re-spawn once.
+  // Listen for permission requests from the Agent SDK (via main process IPC)
+  // When canUseTool fires, the main process forwards the request here.
+  // We show a prompt in the UI and send the response back via IPC.
   useEffect(() => {
-    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-    let latestPattern = '';
+    const handler = (_processId: string, request: PermissionRequestEvent) => {
+      const { requestId, toolName, input } = request;
 
-    const handlePermissionApproved = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      latestPattern = detail?.pattern || '';
+      // Extract a human-readable command description
+      let command = '';
+      if (toolName === 'Bash') {
+        command = (input as any).command || '';
+      } else if (toolName === 'Write' || toolName === 'Edit' || toolName === 'Read') {
+        command = (input as any).file_path || '';
+      } else {
+        command = JSON.stringify(input).slice(0, 200);
+      }
 
-      // Debounce: wait 300ms for more approvals before re-spawning
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(async () => {
-        debounceTimer = null;
+      debugLog('claude', `permission request: ${toolName} — ${command.slice(0, 100)}`, {
+        requestId,
+        toolName,
+        input,
+      });
 
-        const pid = processIdRef.current;
-        if (!pid) return;
-
-        const { currentSession } = useAppStore.getState();
-        const sessionId = currentSession.id;
-        const cwd = currentSession.projectPath;
-        if (!cwd) return;
-
-        const { allowedTools } = usePermissionStore.getState();
-
-        debugLog('claude', `permission approved — re-spawning with allowedTools: [${allowedTools.join(', ')}]`);
-
-        // Kill current process
-        await window.api.claude.kill(pid);
-        processIdRef.current = null;
-
-        // Reset streaming state for the re-spawn
-        streamingTextRef.current = '';
-        turnCountRef.current = 0;
-        useAppStore.getState().clearStreamingContent();
-        useAppStore.getState().clearToolActivities();
-
-        // Re-spawn with same session (--resume) + updated allowedTools
-        const newPid = await window.api.claude.spawn(
-          cwd,
-          sessionId || undefined,
-          'acceptEdits',
-          allowedTools,
-        );
-        processIdRef.current = newPid;
-        useAppStore.getState().setProcessId(newPid);
-        useAppStore.getState().setIsStreaming(true);
-
-        debugLog('claude', `re-spawned with pid: ${newPid}, session: ${sessionId}, sending retry`);
-
-        // Send a message asking Claude to retry the denied command
-        await window.api.claude.send(newPid,
-          `The permission for ${latestPattern} has been granted. Please retry the command that was just denied.`
-        );
-      }, 300);
+      // Add to permission store for UI display
+      usePermissionStore.getState().addRequest({
+        id: requestId,
+        toolName,
+        command,
+        toolPattern: `${toolName}(${command.split(/\s+/).slice(0, 2).join(' ')} *)`,
+        input: input as Record<string, unknown>,
+        timestamp: Date.now(),
+        status: 'pending',
+      });
     };
 
-    window.addEventListener('claude:permission-approved', handlePermissionApproved);
+    window.api.claude.onPermissionRequest(handler);
     return () => {
-      window.removeEventListener('claude:permission-approved', handlePermissionApproved);
-      if (debounceTimer) clearTimeout(debounceTimer);
+      window.api.claude.removePermissionRequestListener(handler);
     };
   }, []);
 
   const startSession = useCallback(
     async (cwd: string, sessionId?: string, permissionMode?: string) => {
       const mode = permissionMode || 'default';
-      const { allowedTools } = usePermissionStore.getState();
 
-      debugLog('claude', `spawning CLI — cwd: ${cwd}${sessionId ? ', resume: ' + sessionId : ''}, mode: ${mode}, allowedTools: [${allowedTools.join(', ')}]`, {
+      debugLog('claude', `spawning SDK session — cwd: ${cwd}${sessionId ? ', resume: ' + sessionId : ''}, mode: ${mode}`, {
         cwd,
         sessionId,
         permissionMode: mode,
-        allowedTools,
       });
 
       if (processIdRef.current) {
@@ -743,7 +662,7 @@ export function useClaude() {
       // Clear any pending permission requests from previous session
       usePermissionStore.getState().clearRequests();
 
-      const pid = await window.api.claude.spawn(cwd, sessionId, mode, allowedTools);
+      const pid = await window.api.claude.spawn(cwd, sessionId, mode);
       processIdRef.current = pid;
       useAppStore.getState().setProcessId(pid);
       useAppStore.getState().setIsStreaming(false);

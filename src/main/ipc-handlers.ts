@@ -44,8 +44,16 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  ipcMain.handle('claude:spawn', (_event, cwd: string, sessionId?: string, permissionMode?: string, allowedTools?: string[]) => {
-    return claudeProcessManager.spawn(cwd, sessionId, permissionMode, allowedTools);
+  // Permission request from SDK canUseTool → forward to renderer
+  claudeProcessManager.on('permission-request', (pid: string, request: unknown) => {
+    const wc = getWebContents();
+    if (wc) {
+      wc.send('claude:permission-request', pid, request);
+    }
+  });
+
+  ipcMain.handle('claude:spawn', async (_event, cwd: string, sessionId?: string, permissionMode?: string) => {
+    return claudeProcessManager.spawn(cwd, sessionId, permissionMode);
   });
 
   ipcMain.handle('claude:send', (_event, processId: string, content: string) => {
@@ -54,6 +62,11 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('claude:kill', (_event, processId: string) => {
     return claudeProcessManager.kill(processId);
+  });
+
+  // Permission response from renderer → forward to SDK canUseTool resolver
+  ipcMain.handle('claude:permission-response', (_event, processId: string, requestId: string, response: { behavior: 'allow' | 'deny'; updatedInput?: Record<string, unknown>; message?: string }) => {
+    return claudeProcessManager.respondToPermission(processId, requestId, response);
   });
 
   // ─── Sessions ─────────────────────────────────────────────────────

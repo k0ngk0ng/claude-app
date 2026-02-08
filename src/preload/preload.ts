@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 export interface ClaudeAPI {
-  spawn: (cwd: string, sessionId?: string, permissionMode?: string, allowedTools?: string[]) => Promise<string>;
+  spawn: (cwd: string, sessionId?: string, permissionMode?: string) => Promise<string>;
   send: (processId: string, content: string) => Promise<boolean>;
   kill: (processId: string) => Promise<boolean>;
   onMessage: (
@@ -10,6 +10,17 @@ export interface ClaudeAPI {
   removeMessageListener: (
     callback: (processId: string, message: unknown) => void
   ) => void;
+  onPermissionRequest: (
+    callback: (processId: string, request: unknown) => void
+  ) => void;
+  removePermissionRequestListener: (
+    callback: (processId: string, request: unknown) => void
+  ) => void;
+  respondToPermission: (
+    processId: string,
+    requestId: string,
+    response: { behavior: 'allow' | 'deny'; updatedInput?: Record<string, unknown>; message?: string }
+  ) => Promise<boolean>;
 }
 
 export interface SessionsAPI {
@@ -57,13 +68,14 @@ export interface AppAPI {
 }
 
 const claudeMessageListeners = new Map<Function, (...args: any[]) => void>();
+const claudePermissionListeners = new Map<Function, (...args: any[]) => void>();
 const terminalDataListeners = new Map<Function, (...args: any[]) => void>();
 const sessionsChangedListeners = new Map<Function, (...args: any[]) => void>();
 
 contextBridge.exposeInMainWorld('api', {
   claude: {
-    spawn: (cwd: string, sessionId?: string, permissionMode?: string, allowedTools?: string[]) =>
-      ipcRenderer.invoke('claude:spawn', cwd, sessionId, permissionMode, allowedTools),
+    spawn: (cwd: string, sessionId?: string, permissionMode?: string) =>
+      ipcRenderer.invoke('claude:spawn', cwd, sessionId, permissionMode),
     send: (processId: string, content: string) =>
       ipcRenderer.invoke('claude:send', processId, content),
     kill: (processId: string) => ipcRenderer.invoke('claude:kill', processId),
@@ -87,6 +99,29 @@ contextBridge.exposeInMainWorld('api', {
         claudeMessageListeners.delete(callback);
       }
     },
+    onPermissionRequest: (callback: (processId: string, request: unknown) => void) => {
+      const wrappedCallback = (
+        _event: Electron.IpcRendererEvent,
+        processId: string,
+        request: unknown
+      ) => {
+        callback(processId, request);
+      };
+      claudePermissionListeners.set(callback, wrappedCallback);
+      ipcRenderer.on('claude:permission-request', wrappedCallback);
+    },
+    removePermissionRequestListener: (callback: (processId: string, request: unknown) => void) => {
+      const wrappedCallback = claudePermissionListeners.get(callback);
+      if (wrappedCallback) {
+        ipcRenderer.removeListener('claude:permission-request', wrappedCallback);
+        claudePermissionListeners.delete(callback);
+      }
+    },
+    respondToPermission: (
+      processId: string,
+      requestId: string,
+      response: { behavior: 'allow' | 'deny'; updatedInput?: Record<string, unknown>; message?: string }
+    ) => ipcRenderer.invoke('claude:permission-response', processId, requestId, response),
   } satisfies ClaudeAPI,
 
   sessions: {

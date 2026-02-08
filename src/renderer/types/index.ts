@@ -1,11 +1,20 @@
 // ─── API types exposed via preload ──────────────────────────────────
 
 export interface ClaudeAPI {
-  spawn: (cwd: string, sessionId?: string, permissionMode?: string, allowedTools?: string[]) => Promise<string>;
+  spawn: (cwd: string, sessionId?: string, permissionMode?: string) => Promise<string>;
   send: (processId: string, content: string) => Promise<boolean>;
   kill: (processId: string) => Promise<boolean>;
   onMessage: (callback: (processId: string, message: ClaudeStreamEvent) => void) => void;
   removeMessageListener: (callback: (processId: string, message: ClaudeStreamEvent) => void) => void;
+  onPermissionRequest: (callback: (processId: string, request: PermissionRequestEvent) => void) => void;
+  removePermissionRequestListener: (callback: (processId: string, request: PermissionRequestEvent) => void) => void;
+  respondToPermission: (processId: string, requestId: string, response: { behavior: 'allow' | 'deny'; updatedInput?: Record<string, unknown>; message?: string }) => Promise<boolean>;
+}
+
+export interface PermissionRequestEvent {
+  requestId: string;
+  toolName: string;
+  input: Record<string, unknown>;
 }
 
 export interface SessionsAPI {
