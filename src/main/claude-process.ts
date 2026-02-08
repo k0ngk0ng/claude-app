@@ -105,12 +105,16 @@ class ClaudeProcessManager extends EventEmitter {
 
     child.stderr?.on('data', (data: Buffer) => {
       const text = data.toString('utf-8').trim();
-      if (text) {
-        this.emit('message', processId, {
-          type: 'error',
-          message: { role: 'system', content: text },
-        });
-      }
+      if (!text) return;
+
+      // Filter out harmless macOS system noise
+      const isNoise = /IMKCFRunLoop|IMKInputSession|NSBundle|CFBundle|IME|InputMethod/i.test(text);
+      if (isNoise) return;
+
+      this.emit('message', processId, {
+        type: 'error',
+        message: { role: 'system', content: text },
+      });
     });
 
     child.on('exit', (code, signal) => {

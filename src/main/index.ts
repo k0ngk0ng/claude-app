@@ -10,6 +10,14 @@ let mainWindow: BrowserWindow | null = null;
 function createWindow(): void {
   const isMac = process.platform === 'darwin';
 
+  // Resolve icon path — works in both dev and production
+  // In dev: assets/ is in project root (process.cwd())
+  // In production: extraResource copies assets/ to <app>/Contents/Resources/assets/ (macOS)
+  //                or <app>/resources/assets/ (Windows/Linux)
+  const iconPath = MAIN_WINDOW_VITE_DEV_SERVER_URL
+    ? path.join(process.cwd(), 'assets', 'icon.png')
+    : path.join(process.resourcesPath, 'assets', 'icon.png');
+
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -20,6 +28,7 @@ function createWindow(): void {
     trafficLightPosition: isMac ? { x: 16, y: 16 } : undefined,
     frame: !isMac,
     show: false,
+    icon: iconPath,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

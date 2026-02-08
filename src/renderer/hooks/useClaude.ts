@@ -83,6 +83,8 @@ export function useClaude() {
   // Track current tool use block
   const currentToolIdRef = useRef<string | null>(null);
   const toolInputJsonRef = useRef('');
+  // Queue for tool results that arrive before the tool activity is added
+  const pendingToolResultsRef = useRef<Map<string, { status: 'done'; output: string }>>(new Map());
 
   useEffect(() => {
     const handler = (processId: string, raw: unknown) => {
@@ -110,6 +112,11 @@ export function useClaude() {
         case 'system': {
           if (event.session_id) {
             setCurrentSession({ id: event.session_id });
+            // Trigger sessions reload — a new session may have been created
+            // Use a short delay to let the JSONL file be written to disk
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent('claude:session-updated'));
+            }, 300);
           }
           break;
         }
@@ -134,12 +141,26 @@ export function useClaude() {
                 const toolName = evt.content_block.name || 'Unknown';
                 currentToolIdRef.current = toolId;
                 toolInputJsonRef.current = '';
-                addToolActivity({
-                  id: toolId,
-                  name: toolName,
-                  status: 'running',
-                  timestamp: Date.now(),
-                });
+
+                // Check if we already have a result queued for this tool
+                const pendingResult = pendingToolResultsRef.current.get(toolId);
+                if (pendingResult) {
+                  pendingToolResultsRef.current.delete(toolId);
+                  addToolActivity({
+                    id: toolId,
+                    name: toolName,
+                    status: 'done',
+                    output: pendingResult.output,
+                    timestamp: Date.now(),
+                  });
+                } else {
+                  addToolActivity({
+                    id: toolId,
+                    name: toolName,
+                    status: 'running',
+                    timestamp: Date.now(),
+                  });
+                }
               }
               break;
             }
@@ -228,9 +249,11 @@ export function useClaude() {
 
         case 'user': {
           // Tool result — Claude CLI executed a tool and got results
-          // Extract tool_use_id and result content to update the activity
           const msg = event.message;
           if (msg && Array.isArray(msg.content)) {
+            // Collect all tool result updates, then apply in one batch
+            const updates = new Map<string, { status: 'done'; output: string }>();
+
             for (const block of msg.content as any[]) {
               if (block.type === 'tool_result' && block.tool_use_id) {
                 // Content can be a string OR an array of {type:"text", text:"..."} blocks
@@ -248,14 +271,30 @@ export function useClaude() {
                   ? resultContent.slice(0, 500) + '\n…(truncated)'
                   : resultContent;
 
-                const { toolActivities } = useAppStore.getState();
-                useAppStore.setState({
-                  toolActivities: toolActivities.map(a =>
-                    a.id === block.tool_use_id
-                      ? { ...a, status: 'done' as const, output: truncated || '(completed)' }
-                      : a
-                  ),
+                updates.set(block.tool_use_id, {
+                  status: 'done' as const,
+                  output: truncated || '(completed)',
                 });
+              }
+            }
+
+            if (updates.size > 0) {
+              const { toolActivities } = useAppStore.getState();
+              const knownIds = new Set(toolActivities.map(a => a.id));
+
+              // Apply all updates in a single setState
+              useAppStore.setState({
+                toolActivities: toolActivities.map(a => {
+                  const update = updates.get(a.id);
+                  return update ? { ...a, ...update } : a;
+                }),
+              });
+
+              // Queue any results for tools not yet in the activities list
+              for (const [toolId, update] of updates) {
+                if (!knownIds.has(toolId)) {
+                  pendingToolResultsRef.current.set(toolId, update);
+                }
               }
             }
           }
@@ -303,6 +342,7 @@ export function useClaude() {
 
           streamingTextRef.current = '';
           currentModelRef.current = undefined;
+          pendingToolResultsRef.current.clear();
 
           if (event.session_id) {
             setCurrentSession({ id: event.session_id });
@@ -313,6 +353,9 @@ export function useClaude() {
           if (sessionKey) {
             useAppStore.getState().removeRuntime(sessionKey);
           }
+
+          // Trigger sessions reload so new threads appear in sidebar
+          window.dispatchEvent(new CustomEvent('claude:session-updated'));
           break;
         }
 
@@ -320,6 +363,7 @@ export function useClaude() {
           setIsStreaming(false);
           clearStreamingContent();
           clearToolActivities();
+          pendingToolResultsRef.current.clear();
 
           const errorText =
             typeof event.message?.content === 'string'
@@ -345,6 +389,7 @@ export function useClaude() {
           clearStreamingContent();
           clearToolActivities();
           setProcessId(null);
+          pendingToolResultsRef.current.clear();
 
           // Clean up runtime cache
           const exitSessionKey = useAppStore.getState().currentSession.id;
@@ -411,6 +456,7 @@ export function useClaude() {
     clearStreamingContent();
     clearToolActivities();
     streamingTextRef.current = '';
+    pendingToolResultsRef.current.clear();
 
     await window.api.claude.send(pid, content);
   }, []);

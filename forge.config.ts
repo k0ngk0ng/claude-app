@@ -11,6 +11,7 @@ const config: ForgeConfig = {
     executableName: 'claude-app',
     asar: true,
     icon: './assets/icon', // electron-packager auto-resolves .icns (macOS) / .ico (Windows)
+    extraResource: ['./assets'],
   },
   makers: [
     new MakerDMG({

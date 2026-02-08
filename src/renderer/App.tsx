@@ -61,6 +61,17 @@ export default function App() {
     };
   }, [loadSessions]);
 
+  // Reload sessions when a new session is created or completed
+  useEffect(() => {
+    const handleSessionUpdated = () => {
+      loadSessions();
+    };
+    window.addEventListener('claude:session-updated', handleSessionUpdated);
+    return () => {
+      window.removeEventListener('claude:session-updated', handleSessionUpdated);
+    };
+  }, [loadSessions]);
+
   // Keyboard shortcuts
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
