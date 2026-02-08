@@ -4,6 +4,19 @@ import path from 'path';
 import { createRequire } from 'module';
 import { app } from 'electron';
 import fs from 'fs';
+import os from 'os';
+
+// Debug log helper — writes to ~/claude-app-debug.log
+function debugLog(...args: unknown[]) {
+  const msg = args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ');
+  const line = `[${new Date().toISOString()}] ${msg}\n`;
+  try {
+    fs.appendFileSync(path.join(os.homedir(), 'claude-app-debug.log'), line);
+  } catch { /* ignore */ }
+  console.log('[claude-process]', ...args);
+}
+
+debugLog('claude-process module loaded, isPackaged:', app?.isPackaged);
 
 // Dynamic import for ESM module
 let queryFn: typeof import('@anthropic-ai/claude-agent-sdk').query | null = null;
@@ -63,7 +76,7 @@ function getSdkCliPath(): string {
       // For unpacked paths, they exist on disk; for asar paths, they don't
       if (fs.existsSync(candidate) && !candidate.includes('app.asar' + path.sep)) {
         sdkCliPath = candidate;
-        console.log('[claude-process] Resolved SDK cli.js:', sdkCliPath);
+        debugLog('Resolved SDK cli.js:', sdkCliPath);
         return sdkCliPath;
       }
     } catch {
@@ -73,7 +86,7 @@ function getSdkCliPath(): string {
 
   // Last resort — return first candidate
   sdkCliPath = candidates[0] || 'cli.js';
-  console.log('[claude-process] SDK cli.js (fallback):', sdkCliPath);
+  debugLog('SDK cli.js (fallback):', sdkCliPath);
   return sdkCliPath;
 }
 
@@ -137,6 +150,7 @@ class ClaudeProcessManager extends EventEmitter {
     sessionId?: string,
     permissionMode?: string,
   ): Promise<string> {
+    debugLog('spawn called — cwd:', cwd, 'sessionId:', sessionId, 'permissionMode:', permissionMode);
     const processId = randomUUID();
     const abortController = new AbortController();
 
@@ -175,9 +189,9 @@ class ClaudeProcessManager extends EventEmitter {
       stderr: true,
     };
 
-    console.log('[claude-process] SDK cli path:', getSdkCliPath());
-    console.log('[claude-process] cwd:', managed.cwd);
-    console.log('[claude-process] PATH:', process.env.PATH?.split(':').slice(0, 10).join(':'));
+    debugLog('SDK cli path:', getSdkCliPath());
+    debugLog('cwd:', managed.cwd);
+    debugLog('PATH:', process.env.PATH?.split(':').slice(0, 10).join(':'));
 
     // Permission mode
     if (permissionMode && permissionMode !== 'default') {
@@ -263,6 +277,9 @@ class ClaudeProcessManager extends EventEmitter {
       managed.queryInstance = queryIterator;
 
       for await (const message of queryIterator) {
+        // Log all messages for debugging
+        debugLog('message:', JSON.stringify(message).slice(0, 500));
+
         // Forward SDK messages to renderer (same format as stream-json)
         this.emit('message', processId, message);
 
@@ -273,6 +290,8 @@ class ClaudeProcessManager extends EventEmitter {
 
         // Check if result
         if (message.type === 'result') {
+          // Log full result for debugging
+          debugLog('result details:', JSON.stringify(message).slice(0, 2000));
           break;
         }
       }
@@ -289,7 +308,7 @@ class ClaudeProcessManager extends EventEmitter {
           err?.cause ? `\ncause: ${err.cause}` : '',
           err?.code ? `\ncode: ${err.code}` : '',
         ].join('');
-        console.error('[claude-process] Query error:', errDetail);
+        debugLog('Query error:', errDetail);
         this.emit('error', processId, errDetail);
         this.emit('exit', processId, 1, null);
       }

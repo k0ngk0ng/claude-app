@@ -30,8 +30,25 @@ export function BootstrapScreen({ onReady }: BootstrapScreenProps) {
       try {
         // Step 1: Check if runtime deps are available
         setStatusText('Checking runtime dependencies…');
-        const deps = await window.api.app.checkRuntimeDeps();
-        const missing = deps.filter((d) => !d.found);
+
+        // Add a timeout — if checkRuntimeDeps takes too long, skip it
+        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000));
+        const depsResult = await Promise.race([
+          window.api.app.checkRuntimeDeps(),
+          timeoutPromise,
+        ]);
+
+        // If timed out or all deps found, proceed
+        if (!depsResult) {
+          // Timed out — assume deps are available (packaged app includes them)
+          if (!cancelled) {
+            setState('ready');
+            onReady();
+          }
+          return;
+        }
+
+        const missing = depsResult.filter((d) => !d.found);
 
         if (missing.length === 0) {
           // All good — proceed

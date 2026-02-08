@@ -1,8 +1,21 @@
 import { app, BrowserWindow, ipcMain, globalShortcut } from 'electron';
 import path from 'path';
 import os from 'os';
+import fs from 'fs';
 import { execSync } from 'child_process';
 import { registerIpcHandlers } from './ipc-handlers';
+
+// Debug log — write to ~/claude-app-debug.log
+function mainDebugLog(...args: unknown[]) {
+  const msg = args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ');
+  const line = `[${new Date().toISOString()}] [main] ${msg}\n`;
+  try {
+    const logPath = path.join(os.homedir(), 'claude-app-debug.log');
+    fs.appendFileSync(logPath, line);
+  } catch (e) { /* ignore */ }
+}
+
+mainDebugLog('App starting, isPackaged:', app.isPackaged, 'appPath:', app.getAppPath());
 
 // Suppress macOS IMK/NSLog noise (e.g. IMKCFRunLoopWakeUpReliable)
 if (process.platform === 'darwin') {
@@ -75,6 +88,15 @@ function fixPath() {
 
 // Fix PATH before anything else
 fixPath();
+mainDebugLog('PATH fixed:', process.env.PATH?.split(':').slice(0, 8).join(':'));
+
+// Check if node is findable
+try {
+  const nodePath = execSync('which node', { encoding: 'utf-8', timeout: 3000, stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+  mainDebugLog('node found at:', nodePath);
+} catch {
+  mainDebugLog('WARNING: node not found in PATH');
+}
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;

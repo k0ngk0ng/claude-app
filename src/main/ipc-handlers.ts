@@ -299,17 +299,24 @@ export function registerIpcHandlers(): void {
 
   // ─── Bootstrap: check & install runtime dependencies ─────────────
   ipcMain.handle('app:checkRuntimeDeps', async () => {
+    // In packaged app, deps are bundled by forge hook — always report found
+    if (app.isPackaged) {
+      return [
+        { name: '@anthropic-ai/claude-agent-sdk', found: true },
+        { name: 'node-pty', found: true },
+      ];
+    }
+
+    // Dev mode: actually check
     const results: { name: string; found: boolean; error?: string }[] = [];
 
-    // Check @anthropic-ai/claude-agent-sdk
     try {
-      await import('@anthropic-ai/claude-agent-sdk');
-      results.push({ name: '@anthropic-ai/claude-agent-sdk', found: true });
+      const sdkPath = path.join(process.cwd(), 'node_modules', '@anthropic-ai', 'claude-agent-sdk', 'sdk.mjs');
+      results.push({ name: '@anthropic-ai/claude-agent-sdk', found: fs.existsSync(sdkPath) });
     } catch {
       results.push({ name: '@anthropic-ai/claude-agent-sdk', found: false });
     }
 
-    // Check node-pty
     try {
       require('node-pty');
       results.push({ name: 'node-pty', found: true });

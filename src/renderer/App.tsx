@@ -119,6 +119,8 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [togglePanel, openSettings, closeSettings, settingsOpen]);
 
+  const handleDepsReady = useCallback(() => setDepsReady(true), []);
+
   const handleNewThread = useCallback(async () => {
     await stopSession();
     useAppStore.getState().resetCurrentSession();
@@ -149,7 +151,7 @@ export default function App() {
 
   // Show bootstrap screen while checking/installing dependencies
   if (!depsReady) {
-    return <BootstrapScreen onReady={() => setDepsReady(true)} />;
+    return <BootstrapScreen onReady={handleDepsReady} />;
   }
 
   return (
