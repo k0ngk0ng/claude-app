@@ -91,8 +91,9 @@ function loadSettings(): AppSettings {
         'suggest': 'acceptEdits',
         'auto-edit': 'acceptEdits',
         'full-auto': 'bypassPermissions',
+        'default': 'acceptEdits',
       };
-      const validModes = ['default', 'acceptEdits', 'plan', 'bypassPermissions', 'dontAsk'];
+      const validModes = ['acceptEdits', 'plan', 'bypassPermissions', 'dontAsk'];
       if (!validModes.includes(settings.general.autoApprove)) {
         settings.general.autoApprove = (modeMap[settings.general.autoApprove] || 'acceptEdits') as any;
         // Persist the migration

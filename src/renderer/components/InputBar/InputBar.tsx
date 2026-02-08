@@ -10,13 +10,13 @@ interface Attachment {
   preview?: string; // data URL for image preview
 }
 
-type ClaudeMode = 'default' | 'acceptEdits' | 'plan' | 'bypassPermissions';
+type ClaudeMode = 'default' | 'acceptEdits' | 'plan' | 'bypassPermissions' | 'dontAsk';
 
 const MODE_OPTIONS: { value: ClaudeMode; label: string; description: string }[] = [
-  { value: 'default', label: 'Default', description: 'Prompts for permission — may block in non-interactive mode' },
-  { value: 'acceptEdits', label: 'Accept edits', description: 'Auto-approve file edits, ask for bash' },
+  { value: 'acceptEdits', label: 'Accept edits', description: 'Auto-approve file edits, prompt for bash commands' },
+  { value: 'bypassPermissions', label: 'Full auto', description: 'Full autonomy — skip all permission prompts' },
   { value: 'plan', label: 'Plan mode', description: 'Analyze only — no file modifications or commands' },
-  { value: 'bypassPermissions', label: 'Bypass permissions', description: 'Full autonomy, skip all permission prompts' },
+  { value: 'dontAsk', label: "Don't ask", description: 'Auto-deny tools unless pre-approved in permissions' },
 ];
 
 interface InputBarProps {
@@ -441,13 +441,6 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
                            transition-colors"
                 title={currentMode.description}
               >
-                {mode === 'default' && (
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                    <path d="M8 14A6 6 0 108 2a6 6 0 000 12z" stroke="currentColor" strokeWidth="1.2" />
-                    <path d="M6.5 6a1.5 1.5 0 113 0c0 .83-.68 1.1-1.5 1.5V9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-                    <circle cx="8" cy="11" r="0.75" fill="currentColor" />
-                  </svg>
-                )}
                 {mode === 'acceptEdits' && (
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                     <path d="M11.5 1.5l3 3-9 9H2.5v-3l9-9z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
@@ -462,6 +455,19 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
                 {mode === 'plan' && (
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                     <path d="M4 4h8M4 8h8M4 12h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                  </svg>
+                )}
+                {mode === 'dontAsk' && (
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <path d="M8 14A6 6 0 108 2a6 6 0 000 12z" stroke="currentColor" strokeWidth="1.2" />
+                    <path d="M5 5l6 6M11 5l-6 6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                  </svg>
+                )}
+                {mode === 'default' && (
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <path d="M8 14A6 6 0 108 2a6 6 0 000 12z" stroke="currentColor" strokeWidth="1.2" />
+                    <path d="M6.5 6a1.5 1.5 0 113 0c0 .83-.68 1.1-1.5 1.5V9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                    <circle cx="8" cy="11" r="0.75" fill="currentColor" />
                   </svg>
                 )}
                 <span>{currentMode.label}</span>
