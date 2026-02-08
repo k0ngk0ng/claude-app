@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { useAppStore } from '../stores/appStore';
+import { useAppStore, type ToolActivity } from '../stores/appStore';
 import { debugLog } from '../stores/debugLogStore';
-import type { ContentBlock, Message } from '../types';
+import type { ContentBlock, Message, ToolUseInfo } from '../types';
 
 /**
  * Claude CLI stream-json protocol events:
@@ -76,12 +76,50 @@ function extractTextFromContent(
     .join('\n');
 }
 
+/**
+ * Commit the current turn's streaming text + tool activities as a finalized
+ * assistant message. This is called at turn boundaries (when message_start
+ * fires for a new turn after tool use) so each turn becomes its own message
+ * bubble with inline tool cards — matching how history is displayed.
+ */
+function commitCurrentTurn(
+  streamingText: string,
+  tools: ToolActivity[],
+  model?: string,
+): Message | null {
+  if (!streamingText && tools.length === 0) return null;
+
+  // Convert ToolActivity[] to ToolUseInfo[] for the message
+  const toolUse: ToolUseInfo[] = tools.map(t => {
+    let input: Record<string, unknown> = {};
+    if (t.inputFull) {
+      try { input = JSON.parse(t.inputFull); } catch { /* ignore */ }
+    }
+    return {
+      name: t.name,
+      input,
+      result: t.output,
+    };
+  });
+
+  return {
+    id: crypto.randomUUID(),
+    role: 'assistant',
+    content: streamingText,
+    timestamp: new Date().toISOString(),
+    model,
+    ...(toolUse.length > 0 ? { toolUse } : {}),
+  };
+}
+
 export function useClaude() {
   const store = useAppStore();
   const processIdRef = useRef<string | null>(null);
   const streamingTextRef = useRef('');
   const currentModelRef = useRef<string | undefined>(undefined);
   const lastResultIdRef = useRef<string | null>(null);
+  // Track whether we've seen at least one message_start (to detect turn boundaries)
+  const turnCountRef = useRef(0);
   // Track current tool use block
   const currentToolIdRef = useRef<string | null>(null);
   const toolInputJsonRef = useRef('');
@@ -146,18 +184,28 @@ export function useClaude() {
 
           switch (evt.type) {
             case 'message_start': {
-              // New turn starting — clear completed tools from previous turn
-              const { toolActivities: prevTools } = useAppStore.getState();
-              if (prevTools.length > 0) {
-                const stillRunning = prevTools.filter(a => a.status === 'running');
-                if (stillRunning.length < prevTools.length) {
-                  debugLog('claude', `message_start: clearing ${prevTools.length - stillRunning.length} completed tools, keeping ${stillRunning.length} running`);
-                  useAppStore.setState({ toolActivities: stillRunning });
+              turnCountRef.current += 1;
+              const turnNum = turnCountRef.current;
+
+              // If this is turn 2+, commit the previous turn's text + tools
+              // as a finalized assistant message so each turn gets its own bubble.
+              if (turnNum > 1) {
+                const { toolActivities: prevTools } = useAppStore.getState();
+                const prevText = streamingTextRef.current;
+
+                if (prevText || prevTools.length > 0) {
+                  const committed = commitCurrentTurn(prevText, prevTools, currentModelRef.current);
+                  if (committed) {
+                    debugLog('claude', `message_start turn ${turnNum}: committing previous turn — text: ${prevText.length} chars, tools: ${prevTools.length}`);
+                    addMessage(committed);
+                  }
+                  // Reset streaming state for the new turn
+                  streamingTextRef.current = '';
+                  clearStreamingContent();
+                  clearToolActivities();
                 }
               }
-              // Do NOT clear streamingTextRef here — text should accumulate
-              // across turns so the user sees a continuous response.
-              // Only clear on sendMessage (new user message) or result (final).
+
               currentModelRef.current = evt.message?.model || currentModelRef.current;
               currentToolIdRef.current = null;
               toolInputJsonRef.current = '';
@@ -201,12 +249,8 @@ export function useClaude() {
                   });
                 }
               } else if (evt.content_block?.type === 'text') {
-                // New text block starting — if we already have text from a previous
-                // turn, add a separator so content doesn't run together
-                if (streamingTextRef.current && !streamingTextRef.current.endsWith('\n')) {
-                  streamingTextRef.current += '\n\n';
-                  setStreamingContent(streamingTextRef.current);
-                }
+                // Text block starting in current turn — no special handling needed
+                // since each turn is now its own message bubble.
               }
               break;
             }
@@ -297,17 +341,18 @@ export function useClaude() {
         }
 
         case 'assistant': {
-          // Complete assistant message snapshot — contains both text and tool_use blocks
+          // Complete assistant message snapshot — contains both text and tool_use blocks.
           // With --include-partial-messages, this fires multiple times with cumulative content
-          // across ALL turns. We must NOT overwrite streamingTextRef if we're actively
-          // accumulating deltas, as the snapshot includes text from previous turns too.
+          // across ALL turns. Since we now commit previous turns as separate messages,
+          // we must NOT use the snapshot text (it includes already-committed turns).
+          // Only use it if streamingTextRef is empty (no deltas received yet for this turn).
           const content = event.message?.content;
           const text = extractTextFromContent(content);
 
           // Only use assistant snapshot text if we haven't received any deltas yet
-          // for this turn (streamingTextRef is empty). Otherwise deltas are the
-          // source of truth.
-          if (text && !streamingTextRef.current) {
+          // for this turn (streamingTextRef is empty). And even then, if we've committed
+          // previous turns (turnCount > 1), the snapshot text is cumulative — skip it.
+          if (text && !streamingTextRef.current && turnCountRef.current <= 1) {
             streamingTextRef.current = text;
             setStreamingContent(text);
           }
@@ -403,51 +448,74 @@ export function useClaude() {
           }
           lastResultIdRef.current = resultId;
 
-          const resultText = typeof event.result === 'string'
-            ? event.result
-            : streamingTextRef.current;
+          // Use the current turn's streaming text (not event.result which is cumulative
+          // across ALL turns). Previous turns have already been committed as messages.
+          const lastTurnText = streamingTextRef.current;
 
-          debugLog('claude', `result received — cost: $${event.total_cost_usd?.toFixed(4) || '?'}, duration: ${event.duration_ms || '?'}ms, text length: ${resultText?.length || 0}, event.result type: ${typeof event.result}`, {
+          // Also grab any remaining tool activities for the final turn
+          const { toolActivities: finalTools } = useAppStore.getState();
+
+          debugLog('claude', `result received — cost: $${event.total_cost_usd?.toFixed(4) || '?'}, duration: ${event.duration_ms || '?'}ms, turns: ${turnCountRef.current}, final turn text: ${lastTurnText?.length || 0}`, {
             session_id: event.session_id,
             total_cost_usd: event.total_cost_usd,
             duration_ms: event.duration_ms,
             num_turns: event.num_turns,
             hasEventResult: event.result !== undefined,
             hasStreamingText: streamingTextRef.current.length > 0,
-            resultPreview: resultText ? resultText.slice(0, 200) : '(empty)',
+            finalToolCount: finalTools.length,
+            resultPreview: lastTurnText ? lastTurnText.slice(0, 200) : '(empty)',
           });
 
           setIsStreaming(false);
           clearStreamingContent();
 
-          // Safety net: mark any still-running tools as done before clearing
-          const { toolActivities: remaining } = useAppStore.getState();
-          if (remaining.some(a => a.status === 'running')) {
-            useAppStore.setState({
-              toolActivities: remaining.map(a =>
-                a.status === 'running' ? { ...a, status: 'done' as const } : a
-              ),
-            });
+          // Safety net: mark any still-running tools as done before committing
+          if (finalTools.some(a => a.status === 'running')) {
+            const markedTools = finalTools.map(a =>
+              a.status === 'running' ? { ...a, status: 'done' as const } : a
+            );
+            // Commit the final turn with marked-done tools
+            if (lastTurnText || markedTools.length > 0) {
+              const message = commitCurrentTurn(lastTurnText, markedTools, currentModelRef.current);
+              if (message) {
+                addMessage({
+                  ...message,
+                  costUsd: event.total_cost_usd,
+                  durationMs: event.duration_ms,
+                });
+              }
+            }
+          } else if (lastTurnText || finalTools.length > 0) {
+            const message = commitCurrentTurn(lastTurnText, finalTools, currentModelRef.current);
+            if (message) {
+              addMessage({
+                ...message,
+                costUsd: event.total_cost_usd,
+                durationMs: event.duration_ms,
+              });
+            }
+          } else if (!lastTurnText && finalTools.length === 0 && turnCountRef.current <= 1) {
+            // Single-turn with no streaming text — try event.result as fallback
+            const fallbackText = typeof event.result === 'string' ? event.result : '';
+            if (fallbackText) {
+              addMessage({
+                id: crypto.randomUUID(),
+                role: 'assistant',
+                content: fallbackText,
+                timestamp: new Date().toISOString(),
+                model: currentModelRef.current,
+                costUsd: event.total_cost_usd,
+                durationMs: event.duration_ms,
+              });
+            } else {
+              debugLog('claude', 'result had no text — no message added', undefined, 'warn');
+            }
           }
+
           clearToolActivities();
-
-          if (resultText) {
-            const message: Message = {
-              id: crypto.randomUUID(),
-              role: 'assistant',
-              content: resultText,
-              timestamp: new Date().toISOString(),
-              model: currentModelRef.current,
-              costUsd: event.total_cost_usd,
-              durationMs: event.duration_ms,
-            };
-            addMessage(message);
-          } else {
-            debugLog('claude', 'result had no text — no message added', undefined, 'warn');
-          }
-
           streamingTextRef.current = '';
           currentModelRef.current = undefined;
+          turnCountRef.current = 0;
           pendingToolResultsRef.current.clear();
 
           if (event.session_id) {
@@ -469,6 +537,7 @@ export function useClaude() {
           setIsStreaming(false);
           clearStreamingContent();
           clearToolActivities();
+          turnCountRef.current = 0;
           pendingToolResultsRef.current.clear();
 
           const errorText =
@@ -496,6 +565,7 @@ export function useClaude() {
           clearStreamingContent();
           clearToolActivities();
           setProcessId(null);
+          turnCountRef.current = 0;
           pendingToolResultsRef.current.clear();
 
           // Clean up runtime cache
@@ -544,6 +614,7 @@ export function useClaude() {
       streamingTextRef.current = '';
       currentModelRef.current = undefined;
       lastResultIdRef.current = null;
+      turnCountRef.current = 0;
 
       const pid = await window.api.claude.spawn(cwd, sessionId, mode);
       processIdRef.current = pid;
@@ -573,6 +644,7 @@ export function useClaude() {
     clearStreamingContent();
     clearToolActivities();
     streamingTextRef.current = '';
+    turnCountRef.current = 0;
     pendingToolResultsRef.current.clear();
 
     await window.api.claude.send(pid, content);
@@ -589,6 +661,7 @@ export function useClaude() {
       clearStreamingContent();
       clearToolActivities();
       streamingTextRef.current = '';
+      turnCountRef.current = 0;
     }
   }, []);
 
