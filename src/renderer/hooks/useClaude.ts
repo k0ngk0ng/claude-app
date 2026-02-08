@@ -318,17 +318,23 @@ export function useClaude() {
                     const urlMatch = partial.match(/"url"\s*:\s*"([^"]+)"/);
                     const promptMatch = partial.match(/"prompt"\s*:\s*"([^"]{0,80})/);
                     const descMatch = partial.match(/"description"\s*:\s*"([^"]{0,80})/);
+                    const subagentMatch = partial.match(/"subagent_type"\s*:\s*"([^"]+)"/);
                     const input = fileMatch?.[1] || cmdMatch?.[1] || patternMatch?.[1]
                       || urlMatch?.[1] || descMatch?.[1] || promptMatch?.[1];
                     const brief = input
                       ? (input.length > 60 ? '…' + input.slice(-57) : input)
                       : undefined;
 
+                    // For Task tool: update name to include subagent type (e.g. "Task (Explore)")
+                    const updatedName = (activity.name === 'Task' && subagentMatch?.[1])
+                      ? `Task (${subagentMatch[1]})`
+                      : activity.name;
+
                     // Always update inputFull, and set brief input once
                     useAppStore.setState({
                       toolActivities: toolActivities.map(a =>
                         a.id === currentToolIdRef.current
-                          ? { ...a, inputFull: partial, input: a.input || brief }
+                          ? { ...a, inputFull: partial, input: a.input || brief, name: updatedName }
                           : a
                       ),
                     });
