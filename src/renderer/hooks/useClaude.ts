@@ -134,13 +134,55 @@ export function useClaude() {
 
       const event = raw as StreamEvent;
 
-      // Skip events from subagents (Task tool children) — they have parent_tool_use_id set.
-      // We only process top-level events. Subagent events would pollute our streaming text
-      // and tool activities with irrelevant data.
+      // Subagent events (Task tool children) — extract progress info for the parent tool card
+      // instead of silently skipping everything.
       if (event.parent_tool_use_id) {
-        // Only log at debug level to avoid noise
-        if (event.type === 'assistant' || event.type === 'user') {
-          debugLog('claude', `subagent event skipped: ${event.type} (parent: ${event.parent_tool_use_id})`);
+        const parentId = event.parent_tool_use_id;
+        const { toolActivities } = useAppStore.getState();
+        const parentTool = toolActivities.find(a => a.id === parentId);
+
+        if (parentTool && parentTool.status === 'running') {
+          // Extract useful progress info from subagent events
+          let progressHint: string | undefined;
+
+          if (event.type === 'assistant' && event.message?.content) {
+            // Subagent is thinking/responding — show brief text
+            const content = event.message.content;
+            if (Array.isArray(content)) {
+              for (const block of content) {
+                if (block.type === 'tool_use' && block.name) {
+                  progressHint = `→ ${block.name}`;
+                  if (block.name === 'Read' && (block as any).input?.file_path) {
+                    const fp = (block as any).input.file_path as string;
+                    progressHint = `→ Reading ${fp.split('/').pop()}`;
+                  } else if (block.name === 'Bash' && (block as any).input?.command) {
+                    const cmd = ((block as any).input.command as string).slice(0, 50);
+                    progressHint = `→ $ ${cmd}`;
+                  } else if (block.name === 'Grep' && (block as any).input?.pattern) {
+                    progressHint = `→ Grep: ${(block as any).input.pattern}`;
+                  } else if (block.name === 'Glob' && (block as any).input?.pattern) {
+                    progressHint = `→ Glob: ${(block as any).input.pattern}`;
+                  } else if (block.name === 'Edit' && (block as any).input?.file_path) {
+                    const fp = (block as any).input.file_path as string;
+                    progressHint = `→ Editing ${fp.split('/').pop()}`;
+                  } else if (block.name === 'Write' && (block as any).input?.file_path) {
+                    const fp = (block as any).input.file_path as string;
+                    progressHint = `→ Writing ${fp.split('/').pop()}`;
+                  }
+                }
+              }
+            }
+          }
+
+          if (progressHint) {
+            useAppStore.setState({
+              toolActivities: toolActivities.map(a =>
+                a.id === parentId
+                  ? { ...a, input: progressHint }
+                  : a
+              ),
+            });
+          }
         }
         return;
       }

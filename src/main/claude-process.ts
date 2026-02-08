@@ -131,6 +131,7 @@ export interface PermissionRequest {
 interface ManagedSession {
   cwd: string;
   sessionId?: string;
+  permissionMode?: string;
   abortController: AbortController;
   permissionResolvers: Map<string, (result: PermissionResponse) => void>;
   queryInstance?: any; // SDK Query object — has setPermissionMode(), interrupt(), etc.
@@ -169,6 +170,7 @@ class ClaudeProcessManager extends EventEmitter {
     const managed: ManagedSession = {
       cwd,
       sessionId,
+      permissionMode,
       abortController,
       permissionResolvers: new Map(),
     };
@@ -197,8 +199,10 @@ class ClaudeProcessManager extends EventEmitter {
       settingSources: ['user', 'project', 'local'],
       systemPrompt: { type: 'preset', preset: 'claude_code' },
       pathToClaudeCodeExecutable: getSdkCliPath(),
-      // Capture stderr for debugging
-      stderr: true,
+      // Capture stderr for debugging — must be a callback function
+      stderr: (data: string) => {
+        debugLog('SDK stderr:', data);
+      },
     };
 
     debugLog('SDK cli path:', getSdkCliPath());
@@ -221,6 +225,12 @@ class ClaudeProcessManager extends EventEmitter {
       input: Record<string, unknown>,
       _opts: { signal: AbortSignal },
     ) => {
+      // Auto-allow everything in bypassPermissions / dontAsk modes
+      if (managed.permissionMode === 'bypassPermissions' || managed.permissionMode === 'dontAsk') {
+        debugLog('canUseTool auto-allow (mode:', managed.permissionMode, '):', toolName);
+        return { behavior: 'allow', updatedInput: input };
+      }
+
       const requestId = randomUUID();
 
       // Emit permission request to renderer
@@ -369,6 +379,7 @@ class ClaudeProcessManager extends EventEmitter {
     if (!managed?.queryInstance) return false;
 
     try {
+      managed.permissionMode = mode;
       await managed.queryInstance.setPermissionMode(mode);
       return true;
     } catch {
