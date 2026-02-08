@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useResizable } from '../../hooks/useResizable';
@@ -11,16 +11,8 @@ export function BottomPanel() {
   const { panels, togglePanel, panelSizes, setPanelSize } = useAppStore();
   const debugMode = useSettingsStore(s => s.settings.general.debugMode);
 
-  // Determine initial active tab
-  const [activeTab, setActiveTab] = useState<BottomTab>(
-    panels.logs && !panels.terminal ? 'logs' : 'terminal'
-  );
-
-  // Sync active tab when panels change externally
-  React.useEffect(() => {
-    if (panels.terminal && !panels.logs) setActiveTab('terminal');
-    else if (panels.logs && !panels.terminal) setActiveTab('logs');
-  }, [panels.terminal, panels.logs]);
+  // Determine active tab based on which panels are open
+  const activeTab: BottomTab = panels.logs && !panels.terminal ? 'logs' : 'terminal';
 
   const { handleMouseDown } = useResizable({
     direction: 'vertical',
@@ -32,7 +24,13 @@ export function BottomPanel() {
   });
 
   const handleTabClick = (tab: BottomTab) => {
-    setActiveTab(tab);
+    if (tab === 'terminal') {
+      if (!panels.terminal) togglePanel('terminal');
+      if (panels.logs) togglePanel('logs');
+    } else if (tab === 'logs') {
+      if (!panels.logs) togglePanel('logs');
+      if (panels.terminal) togglePanel('terminal');
+    }
   };
 
   const handleClose = () => {
@@ -115,9 +113,11 @@ export function BottomPanel() {
 
       {/* Tab content */}
       <div style={{ height: 'calc(100% - 33px)' }}>
-        <div className={activeTab === 'terminal' ? 'h-full' : 'hidden'}>
-          <TerminalPanel bare />
-        </div>
+        {activeTab === 'terminal' && (
+          <div className="h-full">
+            <TerminalPanel bare />
+          </div>
+        )}
         {activeTab === 'logs' && (
           <div className="h-full">
             <LogPanel />

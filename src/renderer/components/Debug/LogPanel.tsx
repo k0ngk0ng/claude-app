@@ -134,7 +134,7 @@ export function LogPanel() {
                 ${log.level === 'error' ? 'bg-red-500/5' : ''}`}
             >
               <div
-                className="flex items-start gap-2 px-2 py-0.5 cursor-pointer select-none"
+                className="flex items-start gap-2 px-2 py-0.5 cursor-pointer"
                 onClick={() => log.detail && toggleExpand(log.id)}
               >
                 {/* Timestamp */}
