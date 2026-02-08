@@ -5,7 +5,7 @@ import { ToolCard } from './ToolCard';
 import { WelcomeScreen } from './WelcomeScreen';
 
 export function ChatView() {
-  const { currentSession, streamingContent, toolActivities } = useAppStore();
+  const { currentSession, streamingContent, toolActivities, isLoadingSession } = useAppStore();
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -18,6 +18,10 @@ export function ChatView() {
       bottomRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages.length, streamingContent, toolActivities.length]);
+
+  if (isLoadingSession) {
+    return <LoadingSkeleton />;
+  }
 
   if (!hasMessages && !isStreaming) {
     return <WelcomeScreen />;
@@ -115,6 +119,65 @@ export function ChatView() {
         )}
 
         <div ref={bottomRef} />
+      </div>
+    </div>
+  );
+}
+
+// ─── Loading Skeleton ────────────────────────────────────────────────
+
+function LoadingSkeleton() {
+  return (
+    <div className="flex-1 overflow-y-auto px-4 py-4">
+      <div className="max-w-3xl mx-auto space-y-6">
+        {/* Simulated user message skeleton */}
+        <div className="flex justify-end">
+          <div className="max-w-[60%] space-y-2">
+            <div className="h-4 bg-surface rounded-lg animate-pulse w-48 ml-auto" />
+            <div className="h-4 bg-surface rounded-lg animate-pulse w-32 ml-auto" />
+          </div>
+        </div>
+
+        {/* Simulated assistant message skeleton */}
+        <div className="flex items-start gap-3">
+          <div className="w-7 h-7 rounded-full bg-surface animate-pulse shrink-0" />
+          <div className="flex-1 space-y-2.5">
+            <div className="h-4 bg-surface rounded-lg animate-pulse w-full" />
+            <div className="h-4 bg-surface rounded-lg animate-pulse w-5/6" />
+            <div className="h-4 bg-surface rounded-lg animate-pulse w-4/6" />
+            {/* Tool card skeleton */}
+            <div className="h-10 bg-surface rounded-lg animate-pulse w-72 mt-3" />
+          </div>
+        </div>
+
+        {/* Another user message skeleton */}
+        <div className="flex justify-end">
+          <div className="max-w-[60%] space-y-2">
+            <div className="h-4 bg-surface rounded-lg animate-pulse w-40 ml-auto" />
+          </div>
+        </div>
+
+        {/* Another assistant skeleton */}
+        <div className="flex items-start gap-3">
+          <div className="w-7 h-7 rounded-full bg-surface animate-pulse shrink-0" />
+          <div className="flex-1 space-y-2.5">
+            <div className="h-4 bg-surface rounded-lg animate-pulse w-full" />
+            <div className="h-4 bg-surface rounded-lg animate-pulse w-3/4" />
+            <div className="h-4 bg-surface rounded-lg animate-pulse w-5/6" />
+            <div className="h-4 bg-surface rounded-lg animate-pulse w-2/3" />
+          </div>
+        </div>
+
+        {/* Loading indicator */}
+        <div className="flex justify-center pt-4">
+          <div className="flex items-center gap-2 text-text-muted">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="animate-spin">
+              <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" className="text-border" />
+              <path d="M14 8a6 6 0 00-6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-accent" />
+            </svg>
+            <span className="text-sm">Loading conversation…</span>
+          </div>
+        </div>
       </div>
     </div>
   );

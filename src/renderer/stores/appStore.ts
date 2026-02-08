@@ -42,6 +42,7 @@ interface AppStore {
   toolActivities: ToolActivity[];
   // Per-session runtime cache (keyed by session id or processId)
   sessionRuntimes: Map<string, SessionRuntime>;
+  isLoadingSession: boolean;
   gitStatus: GitStatus | null;
   platform: 'mac' | 'windows' | 'linux';
 
@@ -80,6 +81,9 @@ interface AppStore {
   restoreRuntime: (sessionKey: string) => boolean;
   removeRuntime: (sessionKey: string) => void;
 
+  // Loading
+  setIsLoadingSession: (loading: boolean) => void;
+
   // Git
   setGitStatus: (status: GitStatus | null) => void;
 
@@ -116,6 +120,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   streamingContent: '',
   toolActivities: [],
   sessionRuntimes: new Map(),
+  isLoadingSession: false,
   gitStatus: null,
   platform: 'mac',
 
@@ -259,6 +264,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
     runtimes.delete(sessionKey);
     set({ sessionRuntimes: runtimes });
   },
+
+  // Loading
+  setIsLoadingSession: (loading) => set({ isLoadingSession: loading }),
 
   // Git
   setGitStatus: (status) => set({ gitStatus: status }),

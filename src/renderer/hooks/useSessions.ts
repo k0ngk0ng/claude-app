@@ -175,16 +175,14 @@ export function useSessions() {
       const restored = restoreRuntime(session.id);
 
       if (!restored) {
-        // No cached runtime — load messages from disk
-        const messages = await loadSessionMessages(
-          session.projectPath,
-          session.id
-        );
+        // Show loading state immediately
+        useAppStore.getState().setIsLoadingSession(true);
 
+        // Set session info right away (clears old messages)
         setCurrentSession({
           id: session.id,
           projectPath: session.projectPath,
-          messages,
+          messages: [],
           isStreaming: false,
           processId: null,
         });
@@ -192,6 +190,24 @@ export function useSessions() {
         // Clear streaming state for non-running sessions
         useAppStore.getState().clearStreamingContent();
         useAppStore.getState().clearToolActivities();
+
+        // Load messages from disk (may be slow for large sessions)
+        try {
+          const messages = await loadSessionMessages(
+            session.projectPath,
+            session.id
+          );
+
+          setCurrentSession({
+            id: session.id,
+            projectPath: session.projectPath,
+            messages,
+            isStreaming: false,
+            processId: null,
+          });
+        } finally {
+          useAppStore.getState().setIsLoadingSession(false);
+        }
       }
 
       // Switch current project to match the selected thread
