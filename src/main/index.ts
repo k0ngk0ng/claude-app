@@ -2,6 +2,11 @@ import { app, BrowserWindow, ipcMain, globalShortcut } from 'electron';
 import path from 'path';
 import { registerIpcHandlers } from './ipc-handlers';
 
+// Suppress macOS IMK/NSLog noise (e.g. IMKCFRunLoopWakeUpReliable)
+if (process.platform === 'darwin') {
+  process.env.OS_ACTIVITY_MODE = 'disable';
+}
+
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
