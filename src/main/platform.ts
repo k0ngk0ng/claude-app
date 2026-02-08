@@ -55,8 +55,8 @@ export function encodePath(absolutePath: string): string {
 
 export function getDefaultShell(): string {
   if (isWindows) {
-    // Prefer PowerShell over cmd.exe; COMSPEC is typically cmd.exe
-    return 'powershell.exe';
+    // Use cmd.exe as default — more universally available than PowerShell
+    return process.env.COMSPEC || 'cmd.exe';
   }
   return process.env.SHELL || '/bin/zsh';
 }

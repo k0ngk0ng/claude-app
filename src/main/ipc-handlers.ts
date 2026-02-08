@@ -202,46 +202,49 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('app:openInEditor', async (_event, cwd: string, editor: string) => {
     try {
+      const platform = getPlatform();
+      // On Windows, CLI tools like 'code', 'cursor' etc. are .cmd/.bat scripts
+      // that require shell: true to execute properly
+      const winShell = platform === 'windows' ? { shell: true } : {};
+
       switch (editor) {
         case 'finder':
           await shell.openPath(cwd);
           return true;
         case 'terminal': {
-          // Open native terminal at directory
-          const platform = getPlatform();
           if (platform === 'mac') {
             execFile('open', ['-a', 'Terminal', cwd]);
           } else if (platform === 'windows') {
             execFile('cmd', ['/c', 'start', 'cmd', '/K', `cd /d "${cwd}"`], { shell: true });
           } else {
+            // Linux: try common terminal emulators
             execFile('xdg-open', [cwd]);
           }
           return true;
         }
         case 'vscode':
-          execFile('code', [cwd]);
+          execFile('code', [cwd], winShell);
           return true;
         case 'cursor':
-          execFile('cursor', [cwd]);
+          execFile('cursor', [cwd], winShell);
           return true;
         case 'windsurf':
-          execFile('windsurf', [cwd]);
+          execFile('windsurf', [cwd], winShell);
           return true;
         case 'zed':
-          execFile('zed', [cwd]);
+          execFile('zed', [cwd], winShell);
           return true;
         case 'idea':
-          execFile('idea', [cwd]);
+          execFile('idea', [cwd], winShell);
           return true;
         case 'webstorm':
-          execFile('webstorm', [cwd]);
+          execFile('webstorm', [cwd], winShell);
           return true;
         case 'xcode':
           execFile('open', ['-a', 'Xcode', cwd]);
           return true;
         default:
-          // Try to run the editor command directly
-          execFile(editor, [cwd]);
+          execFile(editor, [cwd], winShell);
           return true;
       }
     } catch (err) {
