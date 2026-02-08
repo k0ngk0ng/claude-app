@@ -1,18 +1,12 @@
 import { app, BrowserWindow, ipcMain, globalShortcut } from 'electron';
 import path from 'path';
 import os from 'os';
-import fs from 'fs';
 import { execSync } from 'child_process';
 import { registerIpcHandlers } from './ipc-handlers';
 
-// Debug log — write to ~/claude-app-debug.log
+// Debug log — console only (no file writes)
 function mainDebugLog(...args: unknown[]) {
-  const msg = args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ');
-  const line = `[${new Date().toISOString()}] [main] ${msg}\n`;
-  try {
-    const logPath = path.join(os.homedir(), 'claude-app-debug.log');
-    fs.appendFileSync(logPath, line);
-  } catch (e) { /* ignore */ }
+  console.log('[main]', ...args);
 }
 
 mainDebugLog('App starting, isPackaged:', app.isPackaged, 'appPath:', app.getAppPath());

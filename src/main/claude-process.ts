@@ -4,15 +4,9 @@ import path from 'path';
 import { createRequire } from 'module';
 import { app } from 'electron';
 import fs from 'fs';
-import os from 'os';
 
-// Debug log helper — writes to ~/claude-app-debug.log
+// Debug log helper — console only (no file writes)
 function debugLog(...args: unknown[]) {
-  const msg = args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ');
-  const line = `[${new Date().toISOString()}] ${msg}\n`;
-  try {
-    fs.appendFileSync(path.join(os.homedir(), 'claude-app-debug.log'), line);
-  } catch { /* ignore */ }
   console.log('[claude-process]', ...args);
 }
 
