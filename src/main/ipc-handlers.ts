@@ -44,8 +44,8 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  ipcMain.handle('claude:spawn', (_event, cwd: string, sessionId?: string, permissionMode?: string) => {
-    return claudeProcessManager.spawn(cwd, sessionId, permissionMode);
+  ipcMain.handle('claude:spawn', (_event, cwd: string, sessionId?: string, permissionMode?: string, allowedTools?: string[]) => {
+    return claudeProcessManager.spawn(cwd, sessionId, permissionMode, allowedTools);
   });
 
   ipcMain.handle('claude:send', (_event, processId: string, content: string) => {

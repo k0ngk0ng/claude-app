@@ -45,7 +45,7 @@ class ClaudeProcessManager extends EventEmitter {
   private processes: Map<string, ManagedProcess> = new Map();
   private isWindows = process.platform === 'win32';
 
-  spawn(cwd: string, sessionId?: string, permissionMode?: string): string {
+  spawn(cwd: string, sessionId?: string, permissionMode?: string, allowedTools?: string[]): string {
     const processId = randomUUID();
     const claudeBinary = getClaudeBinary();
 
@@ -60,6 +60,11 @@ class ClaudeProcessManager extends EventEmitter {
     // Add permission mode (default, acceptEdits, plan, bypassPermissions, dontAsk)
     if (permissionMode && permissionMode !== 'default') {
       args.push('--permission-mode', permissionMode);
+    }
+
+    // Add allowed tool patterns (e.g. "Bash(git add *)", "Bash(git commit *)")
+    if (allowedTools && allowedTools.length > 0) {
+      args.push('--allowedTools', ...allowedTools);
     }
 
     if (sessionId) {

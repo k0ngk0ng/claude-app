@@ -1,23 +1,26 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '../../stores/appStore';
+import { usePermissionStore } from '../../stores/permissionStore';
 import { MessageBubble } from './MessageBubble';
 import { ToolCard } from './ToolCard';
+import { PermissionPrompt } from './PermissionPrompt';
 import { WelcomeScreen } from './WelcomeScreen';
 
 export function ChatView() {
   const { currentSession, streamingContent, toolActivities, isLoadingSession } = useAppStore();
+  const { pendingRequests } = usePermissionStore();
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const { messages, isStreaming } = currentSession;
   const hasMessages = messages.length > 0;
 
-  // Auto-scroll to bottom on new messages, streaming content, or tool activities
+  // Auto-scroll to bottom on new messages, streaming content, tool activities, or permission requests
   useEffect(() => {
     if (bottomRef.current) {
       bottomRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages.length, streamingContent, toolActivities.length]);
+  }, [messages.length, streamingContent, toolActivities.length, pendingRequests.length]);
 
   if (isLoadingSession) {
     return <LoadingSkeleton />;
@@ -115,6 +118,15 @@ export function ChatView() {
               </div>
               <span className="text-sm text-text-muted">Claude is thinking…</span>
             </div>
+          </div>
+        )}
+
+        {/* Permission prompts */}
+        {pendingRequests.length > 0 && (
+          <div className="space-y-2">
+            {pendingRequests.map((request) => (
+              <PermissionPrompt key={request.id} request={request} />
+            ))}
           </div>
         )}
 

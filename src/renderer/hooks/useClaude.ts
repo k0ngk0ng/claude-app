@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useAppStore, type ToolActivity } from '../stores/appStore';
+import { usePermissionStore, extractToolPattern } from '../stores/permissionStore';
 import { debugLog } from '../stores/debugLogStore';
 import type { ContentBlock, Message, ToolUseInfo } from '../types';
 
@@ -401,6 +402,62 @@ export function useClaude() {
                     .map((b: any) => b.text)
                     .join('\n');
                 }
+
+                // Detect permission denial
+                const isPermissionDenied = block.is_error &&
+                  (resultContent.includes('requires approval') ||
+                   resultContent.includes('require approval') ||
+                   resultContent.includes('permission'));
+
+                if (isPermissionDenied) {
+                  // Find the tool activity to get name and command
+                  const { toolActivities } = useAppStore.getState();
+                  const activity = toolActivities.find(a => a.id === block.tool_use_id);
+                  const toolName = activity?.name || 'Bash';
+
+                  // Extract command from the tool's input
+                  let command = '';
+                  if (activity?.inputFull) {
+                    try {
+                      const parsed = JSON.parse(activity.inputFull);
+                      command = parsed.command || parsed.file_path || JSON.stringify(parsed);
+                    } catch {
+                      command = activity.inputFull;
+                    }
+                  }
+                  // Fallback: extract command from the error message itself
+                  if (!command) {
+                    command = resultContent;
+                  }
+
+                  const pattern = extractToolPattern(toolName, command);
+                  debugLog('claude', `permission denied: ${toolName} — ${command.slice(0, 100)}`, {
+                    toolId: block.tool_use_id,
+                    toolName,
+                    command,
+                    pattern,
+                    error: resultContent,
+                  }, 'warn');
+
+                  // Check if this pattern is already allowed (shouldn't happen, but just in case)
+                  const { allowedTools, pendingRequests, addRequest } = usePermissionStore.getState();
+                  const alreadyAllowed = allowedTools.includes(pattern);
+                  const alreadyPending = pendingRequests.some(
+                    r => r.toolPattern === pattern && r.status === 'pending'
+                  );
+
+                  if (!alreadyAllowed && !alreadyPending) {
+                    addRequest({
+                      id: `perm-${Date.now()}-${block.tool_use_id}`,
+                      toolName,
+                      command,
+                      toolPattern: pattern,
+                      timestamp: Date.now(),
+                      status: 'pending',
+                    });
+                  }
+                }
+
                 // Truncate long results for display
                 const truncated = resultContent.length > 500
                   ? resultContent.slice(0, 500) + '\n…(truncated)'
@@ -599,11 +656,13 @@ export function useClaude() {
   const startSession = useCallback(
     async (cwd: string, sessionId?: string, permissionMode?: string) => {
       const mode = permissionMode || 'default';
-      debugLog('claude', `spawning CLI — cwd: ${cwd}${sessionId ? ', resume: ' + sessionId : ''}, mode: ${mode}`, {
+      const { allowedTools } = usePermissionStore.getState();
+
+      debugLog('claude', `spawning CLI — cwd: ${cwd}${sessionId ? ', resume: ' + sessionId : ''}, mode: ${mode}, allowedTools: [${allowedTools.join(', ')}]`, {
         cwd,
         sessionId,
         permissionMode: mode,
-        args: ['--print', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--permission-mode', mode, ...(sessionId ? ['--resume', sessionId] : [])],
+        allowedTools,
       });
 
       if (processIdRef.current) {
@@ -616,7 +675,10 @@ export function useClaude() {
       lastResultIdRef.current = null;
       turnCountRef.current = 0;
 
-      const pid = await window.api.claude.spawn(cwd, sessionId, mode);
+      // Clear any pending permission requests from previous session
+      usePermissionStore.getState().clearRequests();
+
+      const pid = await window.api.claude.spawn(cwd, sessionId, mode, allowedTools);
       processIdRef.current = pid;
       useAppStore.getState().setProcessId(pid);
       useAppStore.getState().setIsStreaming(false);
