@@ -485,6 +485,11 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
                       onClick={() => {
                         setMode(opt.value);
                         setModeOpen(false);
+                        // Update permission mode on running session in real-time
+                        const processId = useAppStore.getState().currentSession.processId;
+                        if (processId) {
+                          window.api.claude.setPermissionMode(processId, opt.value);
+                        }
                       }}
                       className={`flex flex-col w-full px-3 py-2 text-left hover:bg-surface-hover transition-colors
                                   ${mode === opt.value ? 'bg-surface-hover' : ''}`}

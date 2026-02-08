@@ -9,6 +9,7 @@ export interface ClaudeAPI {
   onPermissionRequest: (callback: (processId: string, request: PermissionRequestEvent) => void) => void;
   removePermissionRequestListener: (callback: (processId: string, request: PermissionRequestEvent) => void) => void;
   respondToPermission: (processId: string, requestId: string, response: { behavior: 'allow' | 'deny'; updatedInput?: Record<string, unknown>; message?: string }) => Promise<boolean>;
+  setPermissionMode: (processId: string, mode: string) => Promise<boolean>;
 }
 
 export interface PermissionRequestEvent {

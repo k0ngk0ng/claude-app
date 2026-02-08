@@ -73,6 +73,7 @@ interface ManagedSession {
   sessionId?: string;
   abortController: AbortController;
   permissionResolvers: Map<string, (result: PermissionResponse) => void>;
+  queryInstance?: any; // SDK Query object — has setPermissionMode(), interrupt(), etc.
 }
 
 export interface PermissionResponse {
@@ -205,6 +206,9 @@ class ClaudeProcessManager extends EventEmitter {
         options: options as any,
       });
 
+      // Store the query instance for runtime control (setPermissionMode, etc.)
+      managed.queryInstance = queryIterator;
+
       for await (const message of queryIterator) {
         // Forward SDK messages to renderer (same format as stream-json)
         this.emit('message', processId, message);
@@ -267,6 +271,18 @@ class ClaudeProcessManager extends EventEmitter {
 
     resolver(response);
     return true;
+  }
+
+  async setPermissionMode(processId: string, mode: string): Promise<boolean> {
+    const managed = this.sessions.get(processId);
+    if (!managed?.queryInstance) return false;
+
+    try {
+      await managed.queryInstance.setPermissionMode(mode);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   kill(processId: string): boolean {

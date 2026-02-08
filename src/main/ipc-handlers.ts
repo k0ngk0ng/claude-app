@@ -69,6 +69,11 @@ export function registerIpcHandlers(): void {
     return claudeProcessManager.respondToPermission(processId, requestId, response);
   });
 
+  // Runtime permission mode change
+  ipcMain.handle('claude:setPermissionMode', async (_event, processId: string, mode: string) => {
+    return claudeProcessManager.setPermissionMode(processId, mode);
+  });
+
   // ─── Sessions ─────────────────────────────────────────────────────
   ipcMain.handle('sessions:list', () => {
     return sessionManager.getAllSessions();

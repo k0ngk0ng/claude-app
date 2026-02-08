@@ -21,6 +21,7 @@ export interface ClaudeAPI {
     requestId: string,
     response: { behavior: 'allow' | 'deny'; updatedInput?: Record<string, unknown>; message?: string }
   ) => Promise<boolean>;
+  setPermissionMode: (processId: string, mode: string) => Promise<boolean>;
 }
 
 export interface SessionsAPI {
@@ -122,6 +123,8 @@ contextBridge.exposeInMainWorld('api', {
       requestId: string,
       response: { behavior: 'allow' | 'deny'; updatedInput?: Record<string, unknown>; message?: string }
     ) => ipcRenderer.invoke('claude:permission-response', processId, requestId, response),
+    setPermissionMode: (processId: string, mode: string) =>
+      ipcRenderer.invoke('claude:setPermissionMode', processId, mode),
   } satisfies ClaudeAPI,
 
   sessions: {
