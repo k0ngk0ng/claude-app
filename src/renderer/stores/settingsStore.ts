@@ -16,7 +16,7 @@ const STORAGE_KEY = 'claude-app-settings';
 const defaultSettings: AppSettings = {
   general: {
     sendKey: 'enter',
-    autoApprove: 'default',
+    autoApprove: 'acceptEdits',
     showCostInfo: true,
     notifyOnComplete: true,
     preventSleep: false,
@@ -88,13 +88,13 @@ function loadSettings(): AppSettings {
 
       // Migrate old autoApprove values to new permission mode values
       const modeMap: Record<string, string> = {
-        'suggest': 'default',
+        'suggest': 'acceptEdits',
         'auto-edit': 'acceptEdits',
         'full-auto': 'bypassPermissions',
       };
       const validModes = ['default', 'acceptEdits', 'plan', 'bypassPermissions', 'dontAsk'];
       if (!validModes.includes(settings.general.autoApprove)) {
-        settings.general.autoApprove = (modeMap[settings.general.autoApprove] || 'default') as any;
+        settings.general.autoApprove = (modeMap[settings.general.autoApprove] || 'acceptEdits') as any;
         // Persist the migration
         saveSettings(settings);
       }

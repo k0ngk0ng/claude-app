@@ -34,7 +34,7 @@ export function GeneralSection() {
           value={general.autoApprove}
           onChange={(v) => updateGeneral({ autoApprove: v as any })}
           options={[
-            { value: 'default', label: 'Default — Prompts for permission on first use' },
+            { value: 'default', label: 'Default — Prompts for permission (may block)' },
             { value: 'acceptEdits', label: 'Accept edits — Auto-approve file edits' },
             { value: 'plan', label: 'Plan mode — Analyze only, no modifications' },
             { value: 'dontAsk', label: "Don't ask — Auto-deny unless pre-approved" },

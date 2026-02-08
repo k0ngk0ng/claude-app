@@ -13,7 +13,7 @@ interface Attachment {
 type ClaudeMode = 'default' | 'acceptEdits' | 'plan' | 'bypassPermissions';
 
 const MODE_OPTIONS: { value: ClaudeMode; label: string; description: string }[] = [
-  { value: 'default', label: 'Default', description: 'Prompts for permission on first use of each tool' },
+  { value: 'default', label: 'Default', description: 'Prompts for permission — may block in non-interactive mode' },
   { value: 'acceptEdits', label: 'Accept edits', description: 'Auto-approve file edits, ask for bash' },
   { value: 'plan', label: 'Plan mode', description: 'Analyze only — no file modifications or commands' },
   { value: 'bypassPermissions', label: 'Bypass permissions', description: 'Full autonomy, skip all permission prompts' },
