@@ -19,6 +19,7 @@ interface StreamEvent {
   type: string;
   subtype?: string;
   session_id?: string;
+  parent_tool_use_id?: string | null;
   event?: {
     type: string;
     message?: {
@@ -92,6 +93,17 @@ export function useClaude() {
       if (processId !== processIdRef.current) return;
 
       const event = raw as StreamEvent;
+
+      // Skip events from subagents (Task tool children) — they have parent_tool_use_id set.
+      // We only process top-level events. Subagent events would pollute our streaming text
+      // and tool activities with irrelevant data.
+      if (event.parent_tool_use_id) {
+        // Only log at debug level to avoid noise
+        if (event.type === 'assistant' || event.type === 'user') {
+          debugLog('claude', `subagent event skipped: ${event.type} (parent: ${event.parent_tool_use_id})`);
+        }
+        return;
+      }
 
       if (event.type !== 'stream_event') {
         debugLog('claude', `event: ${event.type}${event.subtype ? '/' + event.subtype : ''}`, event);
