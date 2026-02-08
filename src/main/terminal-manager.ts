@@ -1,5 +1,7 @@
 import { getDefaultShell } from './platform';
 import { randomUUID } from 'crypto';
+import fs from 'fs';
+import os from 'os';
 
 // node-pty is a native module, import dynamically to handle build issues
 let pty: typeof import('node-pty') | null = null;
@@ -24,23 +26,58 @@ class TerminalManager {
     if (!pty) return null;
 
     const id = randomUUID();
-    const shellPath = shell || getDefaultShell();
-    const isWindows = process.platform === 'win32';
 
+    // Resolve shell — ensure it's a valid absolute path
+    let shellPath = shell || getDefaultShell();
+    if (!shellPath.startsWith('/') && process.platform !== 'win32') {
+      // Relative shell name — try common absolute paths
+      const candidates = [`/bin/${shellPath}`, `/usr/bin/${shellPath}`, `/usr/local/bin/${shellPath}`];
+      shellPath = candidates.find(p => { try { return fs.statSync(p).isFile(); } catch { return false; } }) || '/bin/zsh';
+    }
+    // Verify shell exists (macOS/Linux)
+    if (process.platform !== 'win32' && !fs.existsSync(shellPath)) {
+      shellPath = '/bin/zsh';
+      if (!fs.existsSync(shellPath)) {
+        shellPath = '/bin/bash';
+        if (!fs.existsSync(shellPath)) {
+          shellPath = '/bin/sh';
+        }
+      }
+    }
+
+    // Ensure cwd exists — fallback to home directory
+    let safeCwd = cwd;
+    try {
+      if (!fs.existsSync(safeCwd) || !fs.statSync(safeCwd).isDirectory()) {
+        safeCwd = os.homedir();
+      }
+    } catch {
+      safeCwd = os.homedir();
+    }
+
+    const isWindows = process.platform === 'win32';
     const shellArgs = isWindows ? [] : ['-l'];
 
-    const terminal = pty.spawn(shellPath, shellArgs, {
-      name: 'xterm-256color',
-      cols: 80,
-      rows: 24,
-      cwd,
-      env: process.env as Record<string, string>,
-      ...(isWindows ? { useConpty: true } : {}),
-    });
+    console.log(`[terminal] spawning: shell=${shellPath}, cwd=${safeCwd}`);
+
+    let terminal: IPty;
+    try {
+      terminal = pty.spawn(shellPath, shellArgs, {
+        name: 'xterm-256color',
+        cols: 80,
+        rows: 24,
+        cwd: safeCwd,
+        env: process.env as Record<string, string>,
+        ...(isWindows ? { useConpty: true } : {}),
+      });
+    } catch (err) {
+      console.error(`[terminal] posix_spawnp failed: shell=${shellPath}, cwd=${safeCwd}`, err);
+      return null;
+    }
 
     const managed: ManagedTerminal = {
       pty: terminal,
-      cwd,
+      cwd: safeCwd,
       listeners: new Map(),
     };
 
