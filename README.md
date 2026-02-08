@@ -21,19 +21,21 @@ A desktop GUI for [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-co
 ## ✨ Features
 
 - 💬 **Chat Interface** — Streaming responses with markdown rendering, syntax highlighting, and code blocks
-- 🔧 **Real-time Tool Activity** — See Claude's tool calls (Read, Write, Bash, etc.) as collapsible cards with input/output details, matching Claude Code CLI style
+- 🔧 **Real-time Tool Activity** — See Claude's tool calls (Read, Write, Bash, etc.) as collapsible cards with input/output details; subagent (Task) progress with live status updates
 - 📂 **Session History** — Browse and resume all Claude Code sessions from `~/.claude/projects/`
 - 🔄 **Multi-session Support** — Switch between threads without losing streaming state; per-session runtime preservation
 - 🖥️ **Integrated Terminal** — Full terminal emulator (xterm.js + node-pty) embedded in the app
 - 📝 **Git Integration** — View unstaged/staged changes, stage/unstage files, commit, push, and push tags — all inline
 - 🖼️ **Image Paste** — Paste images from clipboard (⌘V / Ctrl+V) to include in conversations
 - 📁 **Open in Editor** — Quick-open project in VS Code, Cursor, Zed, Windsurf, or other detected editors
-- ⌨️ **Keyboard Shortcuts** — `⌘N` new thread, `⌘T` terminal, `⌘D` diff panel, `⌘B` sidebar
+- ⌨️ **Keyboard Shortcuts** — `⌘N` new thread, `⌘T` terminal, `⌘D` diff panel, `⌘B` sidebar, `⌘,` settings
 - 📐 **Resizable Panels** — Drag to resize sidebar, terminal, and diff panel
-- 🎨 **Dark Theme** — Codex-inspired dark UI with orange accent
-- 🖥️ **Cross-Platform** — Native experience on macOS (frameless window), Windows (PowerShell + ConPTY), and Linux
-- ⚙️ **Settings** — Model selection, permissions, MCP servers, git config, appearance, keybindings
+- 🎨 **Theme Support** — Dark, Light, and System (auto-switch) themes
+- 🔗 **Claude Code Config Sync** — Bidirectional sync with `~/.claude/settings.json` — env vars, `includeCoAuthoredBy`, and more
+- 🔐 **Permission Modes** — Default, Accept Edits, Plan, Bypass Permissions, Don't Ask
+- ⚙️ **Settings** — Claude Code config, permissions, MCP servers, git, appearance, keybindings
 - 🔍 **Dependency Check** — Auto-detects missing Claude CLI or Git on startup with install hints
+- 🖥️ **Cross-Platform** — Native experience on macOS, Windows, and Linux — install and use, no extra setup needed
 
 ## 📸 Screenshots
 
@@ -45,8 +47,8 @@ A desktop GUI for [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-co
 ┌─────────────────────────────────────────────────────────────┐
 │                     Electron Main Process                    │
 │  ┌──────────────┐ ┌──────────────┐ ┌──────────────────────┐ │
-│  │ Claude CLI    │ │ Git Manager  │ │ Terminal Manager     │ │
-│  │ Process Mgr   │ │ (git ops)    │ │ (node-pty)           │ │
+│  │ Claude SDK    │ │ Git Manager  │ │ Terminal Manager     │ │
+│  │ Agent Query   │ │ (git ops)    │ │ (node-pty)           │ │
 │  └──────┬───────┘ └──────┬───────┘ └──────────┬───────────┘ │
 │         │                │                     │             │
 │  ┌──────┴────────────────┴─────────────────────┴───────────┐ │
@@ -70,7 +72,6 @@ A desktop GUI for [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-co
 
 ### Prerequisites
 
-- **Node.js** 20+
 - **Claude Code CLI** installed and authenticated
   ```bash
   npm install -g @anthropic-ai/claude-code
@@ -81,16 +82,26 @@ A desktop GUI for [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-co
   - Windows: [git-scm.com](https://git-scm.com/download/win)
   - Linux: `sudo apt install git`
 
-> 💡 The app checks for these dependencies on startup and shows install hints if anything is missing.
+### Download Pre-built Releases
 
-### Install & Run
+Check the [Releases](https://github.com/k0ngk0ng/claude-app/releases) page for pre-built installers:
+
+| Platform | Format |
+|---|---|
+| macOS | `.dmg` (Apple Silicon + Intel) |
+| Windows | `.exe` (Squirrel installer) |
+| Linux | `.deb` + `.zip` |
+
+> 💡 All dependencies are bundled — install and use, no extra setup needed.
+
+### Build from Source
 
 ```bash
 # Clone the repo
 git clone https://github.com/k0ngk0ng/claude-app.git
 cd claude-app
 
-# Install dependencies
+# Install dependencies (auto-rebuilds node-pty for Electron)
 npm install
 
 # Launch in dev mode
@@ -110,9 +121,29 @@ npm run make
 # → Linux: .deb + ZIP
 ```
 
-### Download Pre-built Releases
+## ⚙️ Settings
 
-Check the [Releases](https://github.com/k0ngk0ng/claude-app/releases) page for pre-built installers for macOS, Windows, and Linux.
+### Claude Code Configuration
+
+The app provides a **Claude Code** settings panel that bidirectionally syncs with `~/.claude/settings.json`:
+
+- **API Configuration** — `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`
+- **Model Settings** — `CLAUDE_CODE_MAX_OUTPUT_TOKENS`, `CLAUDE_MODEL`
+- **Proxy** — `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`
+- **Custom Environment Variables** — Add any env var for the Claude process
+- **Include Co-Authored-By** — Toggle `includeCoAuthoredBy` in `~/.claude/settings.json`
+- **Import / Export** — Import/export settings in `~/.claude/settings.json` compatible format
+
+Changes made in the app are written back to `~/.claude/settings.json`, and vice versa.
+
+### Other Settings
+
+- **General** — Send key, permission mode, notifications, debug mode
+- **Permissions** — File read/write, bash, MCP access controls
+- **MCP Servers** — Configure Model Context Protocol servers
+- **Git** — Auto-stage, diff on commit, auto-push, commit prefix
+- **Appearance** — Theme (Dark/Light/System), font size, font family, line numbers
+- **Keybindings** — Customize keyboard shortcuts
 
 ## 📁 Project Structure
 
@@ -124,33 +155,34 @@ claude-app/
 ├── scripts/
 │   └── sync-version.mjs        # Sync version from git tag / commit hash
 ├── assets/
-│   ├── icon.icns               # macOS app icon (Claude)
-│   ├── icon.ico                # Windows app icon (Claude)
+│   ├── icon.icns               # macOS app icon
+│   ├── icon.ico                # Windows app icon
 │   └── icon.png                # Linux / source icon (512×512)
-├── forge.config.ts             # Electron Forge config
+├── forge.config.ts             # Electron Forge config (packaging, native modules)
 ├── vite.main.config.ts         # Vite config — main process
 ├── vite.preload.config.ts      # Vite config — preload script
 ├── vite.renderer.config.ts     # Vite config — React renderer
 ├── tsconfig.json
 ├── src/
 │   ├── main/                   # Electron Main Process
-│   │   ├── index.ts            # App entry, BrowserWindow
-│   │   ├── claude-process.ts   # Claude CLI process manager
+│   │   ├── index.ts            # App entry, BrowserWindow, PATH fix
+│   │   ├── claude-process.ts   # Claude Agent SDK integration
 │   │   ├── session-manager.ts  # Session history reader
 │   │   ├── git-manager.ts      # Git operations wrapper
 │   │   ├── terminal-manager.ts # node-pty terminal manager
 │   │   ├── ipc-handlers.ts     # IPC channel registration
-│   │   └── platform.ts         # Cross-platform utilities + dependency check
+│   │   └── platform.ts         # Cross-platform utilities + Claude config
 │   ├── preload/
 │   │   └── preload.ts          # contextBridge API
 │   └── renderer/               # React UI
-│       ├── App.tsx             # Root layout (3-panel)
+│       ├── App.tsx             # Root layout (3-panel) + theme switching
 │       ├── stores/
 │       │   ├── appStore.ts     # Zustand global state + per-session runtime
-│       │   └── settingsStore.ts # Settings state
+│       │   ├── settingsStore.ts # Settings state (localStorage + sync)
+│       │   └── debugLogStore.ts # Debug log store
 │       ├── types/index.ts      # TypeScript types
 │       ├── hooks/
-│       │   ├── useClaude.ts    # Claude stream-json protocol handler
+│       │   ├── useClaude.ts    # Claude Agent SDK event handler
 │       │   ├── useSessions.ts  # Session management + runtime save/restore
 │       │   ├── useGit.ts       # Git operations
 │       │   ├── useTerminal.ts  # Terminal lifecycle
@@ -160,12 +192,12 @@ claude-app/
 │       │   ├── TopBar/         # Action bar (Open, Commit, Push)
 │       │   ├── Chat/           # Chat view + messages + tool cards
 │       │   ├── InputBar/       # Message input + file attach + image paste
-│       │   ├── Terminal/       # xterm.js terminal panel
+│       │   ├── BottomPanel/    # Terminal + Debug Logs tabs
 │       │   ├── DiffPanel/      # Git diff viewer
-│       │   ├── Settings/       # Settings modal
+│       │   ├── Settings/       # Settings (General, Claude Code, Permissions, etc.)
 │       │   └── StatusBar/      # Bottom status bar
 │       └── styles/
-│           └── globals.css     # Tailwind CSS 4 + custom theme
+│           └── globals.css     # Tailwind CSS 4 + dark/light theme variables
 ```
 
 ## ⚙️ Tech Stack
@@ -173,6 +205,7 @@ claude-app/
 | Layer | Technology |
 |---|---|
 | Desktop Framework | Electron 35 (electron-forge + Vite) |
+| Claude Integration | @anthropic-ai/claude-agent-sdk |
 | UI | React 18 + TypeScript |
 | Styling | Tailwind CSS 4 |
 | State Management | Zustand 5 |
@@ -183,42 +216,35 @@ claude-app/
 
 ## 🔌 How It Works
 
-### Claude CLI Integration
+### Claude Agent SDK Integration
 
-The app communicates with Claude Code CLI via the **stream-json protocol**:
+The app uses the **@anthropic-ai/claude-agent-sdk** to communicate with Claude Code:
 
-```
-App → stdin:  {"type":"user","message":{"role":"user","content":"..."}}
-CLI → stdout: {"type":"stream_event","event":{"type":"content_block_delta",...}}
-```
-
-Key flags: `--print --input-format stream-json --output-format stream-json --verbose --include-partial-messages`
-
-### Stream Protocol Events
-
-| Event | Description |
-|---|---|
-| `system` | Session initialization, provides session_id |
-| `stream_event/message_start` | New assistant message begins |
-| `stream_event/content_block_start` | Text or tool_use block starts |
-| `stream_event/content_block_delta` | Streaming text or tool input JSON |
-| `stream_event/content_block_stop` | Block complete |
-| `assistant` | Complete assistant message snapshot |
-| `user` | Tool results (tool_result blocks) |
-| `result` | Final result with cost, duration, session_id |
+- **`query()`** — Starts a streaming conversation with Claude
+- **`canUseTool`** callback — Bridges permission requests to the UI (auto-allows in bypass mode)
+- **`setPermissionMode()`** — Runtime permission mode changes
+- **Subagent events** — Task tool progress is extracted and displayed on tool cards (e.g. `Task (Explore) → Reading package.json`)
 
 ### Session Management
 
 - **Discovery** — Reads from `~/.claude/projects/` (sessions-index.json + JSONL files)
-- **Resume** — Spawns CLI with `--resume <session-id>` to continue conversations
+- **Resume** — Uses SDK `resume` option to continue conversations
 - **Runtime Preservation** — Switching threads saves/restores streaming state (tool activities, content)
 
 ### Tool Activity Display
 
 Tool calls are shown as collapsible cards matching Claude Code CLI style:
 - ▶ Spinner while running → ✓ Checkmark when done
-- Tool name + brief input shown inline
+- Tool name + brief input shown inline (e.g. `Read → src/App.tsx`)
+- Subagent tools show type and live progress (e.g. `Task (Explore) → Grep: TODO`)
 - Expand to see full input JSON and output
+
+### Packaging
+
+Native modules are handled automatically during packaging:
+- **node-pty** — Rebuilt for Electron ABI via `@electron/rebuild`, then copied into the asar (with native files unpacked)
+- **claude-agent-sdk** — Copied into the asar with `cli.js` unpacked for child process spawning
+- **PATH fix** — macOS Dock-launched apps get full user PATH by sourcing the login shell
 
 ## 🔄 CI/CD
 
@@ -247,9 +273,9 @@ git push --tags
 | | macOS | Windows | Linux |
 |---|---|---|---|
 | Window | Frameless (hiddenInset) | Standard frame | Standard frame |
-| Terminal | zsh (default) | PowerShell + ConPTY | bash/zsh |
+| Terminal | zsh (default) | cmd.exe (COMSPEC) | bash/zsh |
 | Installer | DMG + ZIP | Squirrel (.exe) | .deb + ZIP |
-| Claude binary | `~/.local/bin/claude` | `%USERPROFILE%\.local\bin\claude.cmd` | `~/.local/bin/claude` |
+| Editors | VS Code, Cursor, Zed, Xcode, etc. | VS Code, Cursor (shell: true) | VS Code, Cursor, Zed |
 | App icon | .icns | .ico | .png |
 
 ## 📄 License
