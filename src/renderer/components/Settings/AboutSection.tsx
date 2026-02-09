@@ -271,7 +271,7 @@ export function AboutSection() {
                   href="#"
                   onClick={(e) => {
                     e.preventDefault();
-                    window.api.app.openFile(updateStatus.release.htmlUrl);
+                    window.api.app.openExternal(updateStatus.release.htmlUrl);
                   }}
                   className="text-xs text-text-muted hover:text-accent transition-colors"
                 >
@@ -348,7 +348,7 @@ export function AboutSection() {
             href="#"
             onClick={(e) => {
               e.preventDefault();
-              window.api.app.openFile('https://github.com/k0ngk0ng/claude-app');
+              window.api.app.openExternal('https://github.com/k0ngk0ng/claude-app');
             }}
             className="flex items-center gap-2 text-sm text-text-secondary hover:text-accent transition-colors"
           >
@@ -362,7 +362,7 @@ export function AboutSection() {
             href="#"
             onClick={(e) => {
               e.preventDefault();
-              window.api.app.openFile('https://github.com/k0ngk0ng/claude-app/releases');
+              window.api.app.openExternal('https://github.com/k0ngk0ng/claude-app/releases');
             }}
             className="flex items-center gap-2 text-sm text-text-secondary hover:text-accent transition-colors"
           >
@@ -376,7 +376,7 @@ export function AboutSection() {
             href="#"
             onClick={(e) => {
               e.preventDefault();
-              window.api.app.openFile('https://github.com/k0ngk0ng/claude-app/issues');
+              window.api.app.openExternal('https://github.com/k0ngk0ng/claude-app/issues');
             }}
             className="flex items-center gap-2 text-sm text-text-secondary hover:text-accent transition-colors"
           >

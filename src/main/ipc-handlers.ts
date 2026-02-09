@@ -652,6 +652,15 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  ipcMain.handle('app:openExternal', async (_event, url: string) => {
+    try {
+      await shell.openExternal(url);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+
   // ─── Auto-watch sessions directory for changes ────────────────────
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   sessionManager.watchForChanges(() => {

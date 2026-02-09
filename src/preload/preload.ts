@@ -86,6 +86,7 @@ export interface AppAPI {
   toggleDevTools: () => Promise<void>;
   showItemInFolder: (fullPath: string) => Promise<boolean>;
   openFile: (fullPath: string) => Promise<boolean>;
+  openExternal: (url: string) => Promise<boolean>;
   checkForUpdates: () => Promise<{
     version: string;
     tagName: string;
@@ -258,6 +259,7 @@ contextBridge.exposeInMainWorld('api', {
     toggleDevTools: () => ipcRenderer.invoke('app:toggleDevTools'),
     showItemInFolder: (fullPath: string) => ipcRenderer.invoke('app:showItemInFolder', fullPath),
     openFile: (fullPath: string) => ipcRenderer.invoke('app:openFile', fullPath),
+    openExternal: (url: string) => ipcRenderer.invoke('app:openExternal', url),
     checkForUpdates: () => ipcRenderer.invoke('app:checkForUpdates'),
     downloadUpdate: (downloadUrl: string, fileName: string) => ipcRenderer.invoke('app:downloadUpdate', downloadUrl, fileName),
     installUpdate: (filePath: string) => ipcRenderer.invoke('app:installUpdate', filePath),
