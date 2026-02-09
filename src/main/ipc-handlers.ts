@@ -448,15 +448,32 @@ export function registerIpcHandlers(): void {
 
   // ─── File operations ─────────────────────────────────────────────
   ipcMain.handle('app:showItemInFolder', (_event, fullPath: string) => {
-    shell.showItemInFolder(fullPath);
-    return true;
+    try {
+      // showItemInFolder works for files; for directories, open the directory itself
+      const stat = fs.statSync(fullPath);
+      if (stat.isDirectory()) {
+        shell.openPath(fullPath);
+      } else {
+        shell.showItemInFolder(fullPath);
+      }
+      return true;
+    } catch (err: any) {
+      console.error('showItemInFolder failed:', fullPath, err?.message);
+      return false;
+    }
   });
 
   ipcMain.handle('app:openFile', async (_event, fullPath: string) => {
     try {
-      await shell.openPath(fullPath);
+      const result = await shell.openPath(fullPath);
+      // shell.openPath returns empty string on success, error message on failure
+      if (result) {
+        console.error('openFile failed:', fullPath, result);
+        return false;
+      }
       return true;
-    } catch {
+    } catch (err: any) {
+      console.error('openFile error:', fullPath, err?.message);
       return false;
     }
   });

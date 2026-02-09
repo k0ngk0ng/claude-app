@@ -77,7 +77,7 @@ export interface AppAPI {
   onInstallProgress: (callback: (data: string) => void) => void;
   removeInstallProgressListener: (callback: (data: string) => void) => void;
   toggleDevTools: () => Promise<void>;
-  showItemInFolder: (fullPath: string) => void;
+  showItemInFolder: (fullPath: string) => Promise<boolean>;
   openFile: (fullPath: string) => Promise<boolean>;
 }
 

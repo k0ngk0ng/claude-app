@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAppStore } from '../../stores/appStore';
+import { debugLog } from '../../stores/debugLogStore';
 
 interface TreeNode {
   name: string;
@@ -127,33 +128,53 @@ function ContextMenu({ x, y, node, projectPath, onClose }: ContextMenuProps) {
   const fullPath = `${projectPath}/${node.path}`;
 
   const handleCopyName = () => {
+    debugLog('app', `Copy name: ${node.name}`);
     navigator.clipboard.writeText(node.name);
     onClose();
   };
 
   const handleCopyPath = () => {
+    debugLog('app', `Copy relative path: ${node.path}`);
     navigator.clipboard.writeText(node.path);
     onClose();
   };
 
   const handleCopyFullPath = () => {
+    debugLog('app', `Copy full path: ${fullPath}`);
     navigator.clipboard.writeText(fullPath);
     onClose();
   };
 
-  const handleRevealInFinder = () => {
-    window.api.app.showItemInFolder(fullPath);
+  const handleRevealInFinder = async () => {
+    debugLog('app', `Reveal in Finder: ${fullPath}`);
+    try {
+      const result = await window.api.app.showItemInFolder(fullPath);
+      debugLog('app', `Reveal in Finder result: ${result}`);
+    } catch (err: any) {
+      debugLog('app', `Reveal in Finder error: ${err?.message}`, err, 'error');
+    }
     onClose();
   };
 
-  const handleOpenFile = () => {
-    window.api.app.openFile(fullPath);
+  const handleOpenFile = async () => {
+    debugLog('app', `Open file: ${fullPath}`);
+    try {
+      const result = await window.api.app.openFile(fullPath);
+      debugLog('app', `Open file result: ${result}`);
+    } catch (err: any) {
+      debugLog('app', `Open file error: ${err?.message}`, err, 'error');
+    }
     onClose();
   };
 
   const handleOpenInEditor = async (editor: string) => {
-    // For files, open the file directly; for dirs, open the dir
-    await window.api.app.openInEditor(fullPath, editor);
+    debugLog('app', `Open in ${editor}: ${fullPath}`);
+    try {
+      const result = await window.api.app.openInEditor(fullPath, editor);
+      debugLog('app', `Open in ${editor} result: ${result}`);
+    } catch (err: any) {
+      debugLog('app', `Open in ${editor} error: ${err?.message}`, err, 'error');
+    }
     onClose();
   };
 
