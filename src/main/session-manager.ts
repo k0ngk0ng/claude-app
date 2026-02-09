@@ -321,6 +321,50 @@ class SessionManager {
     return entries;
   }
 
+  /**
+   * Read the first user prompt from a JSONL file (first 8KB).
+   * Skips <ide_opened_file> prompts if a real user message follows.
+   */
+  private readFirstPromptFromJsonl(jsonlPath: string): string {
+    try {
+      const fd = fs.openSync(jsonlPath, 'r');
+      const buf = Buffer.alloc(8192);
+      const bytesRead = fs.readSync(fd, buf, 0, 8192, 0);
+      fs.closeSync(fd);
+
+      const head = buf.toString('utf-8', 0, bytesRead);
+      const lines = head.split('\n').filter((l) => l.trim());
+
+      let firstPrompt = '';
+      for (const line of lines) {
+        try {
+          const parsed = JSON.parse(line);
+          if (parsed.type === 'user' && parsed.message?.role === 'user') {
+            const content = parsed.message.content;
+            let text = '';
+            if (typeof content === 'string') {
+              text = content.slice(0, 200);
+            } else if (Array.isArray(content)) {
+              const textBlock = content.find((b: any) => b.type === 'text' && b.text);
+              if (textBlock) text = textBlock.text.slice(0, 200);
+            }
+            // Skip IDE-only prompts, try to find a real user message
+            if (text && !text.startsWith('<ide_opened_file>')) {
+              return text;
+            } else if (!firstPrompt) {
+              firstPrompt = text;
+            }
+          }
+        } catch {
+          // skip malformed line
+        }
+      }
+      return firstPrompt || '';
+    } catch {
+      return '';
+    }
+  }
+
   getAllSessions(): SessionInfo[] {
     const allSessions: SessionInfo[] = [];
     const projects = this.listAllProjects();
@@ -328,6 +372,8 @@ class SessionManager {
     for (const project of projects) {
       // Use encodedPath for directory lookup
       const sessions = this.listSessions(project.encodedPath);
+      const projectDir = path.join(this.sessionsDir, project.encodedPath);
+
       for (const session of sessions) {
         if (session.isSidechain) continue; // Skip sidechain sessions
         // session.projectPath (from index) is the real path; project.path is decoded fallback
@@ -335,12 +381,17 @@ class SessionManager {
         const resolvedName = resolvedPath
           ? resolvedPath.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || project.name
           : project.name;
+
+        // Always read firstPrompt from JSONL file (not from sessions-index.json)
+        const jsonlPath = path.join(projectDir, `${session.sessionId}.jsonl`);
+        const firstPrompt = this.readFirstPromptFromJsonl(jsonlPath);
+
         allSessions.push({
           id: session.sessionId,
           projectPath: resolvedPath,
           projectName: resolvedName,
-          title: this.cleanPrompt(session.summary || session.firstPrompt?.slice(0, 80) || 'Untitled'),
-          lastMessage: this.cleanPrompt(session.firstPrompt || ''),
+          title: this.cleanPrompt(session.summary || firstPrompt.slice(0, 80) || 'Untitled'),
+          lastMessage: this.cleanPrompt(firstPrompt),
           updatedAt: session.modified || session.created || '',
         });
       }
@@ -407,11 +458,12 @@ class SessionManager {
   getSessionMessages(projectPath: string, sessionId: string): MessageEntry[] {
     const encodedDir = this.findEncodedDir(projectPath);
     if (!encodedDir) {
-      console.error(`Could not find session directory for: ${projectPath}`);
+      console.error(`[session] Could not find session directory for: ${projectPath}`);
       return [];
     }
 
     const filePath = path.join(this.sessionsDir, encodedDir, `${sessionId}.jsonl`);
+    console.log(`[session] Loading messages from: ${filePath}`);
 
     try {
       const content = fs.readFileSync(filePath, 'utf-8');

@@ -156,13 +156,13 @@ export function useSessions() {
   const loadSessionMessages = useCallback(
     async (projectPath: string, sessionId: string): Promise<Message[]> => {
       try {
-        debugLog('session', `loading messages: ${sessionId} from ${projectPath}`);
+        debugLog('session', `loading messages: ${sessionId}\n  projectPath: ${projectPath}\n  expected jsonl: ~/.claude/projects/.../${sessionId}.jsonl`);
         const rawMessages = await window.api.sessions.getMessages(
           projectPath,
           sessionId
         );
+        debugLog('session', `parsed ${parseRawMessages(rawMessages).length} messages from ${rawMessages.length} raw entries`);
         const messages = parseRawMessages(rawMessages);
-        debugLog('session', `parsed ${messages.length} messages from ${rawMessages.length} raw entries`);
         return messages;
       } catch (err) {
         debugLog('session', `failed to load messages: ${sessionId}`, err, 'error');
