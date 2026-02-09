@@ -704,7 +704,7 @@ export function registerIpcHandlers(): void {
     return { name, fileName, type: ext, scope, description, argumentHint, content, filePath };
   }
 
-  ipcMain.handle('skills:list', async (_event, projectPath?: string) => {
+  ipcMain.handle('skills:list', async () => {
     const skills: ReturnType<typeof parseSkillFile>[] = [];
 
     // Global skills from ~/.claude/commands/
@@ -714,27 +714,13 @@ export function registerIpcHandlers(): void {
         const ext = path.extname(file);
         if (ext === '.md' || ext === '.sh') {
           const fullPath = path.join(globalCommandsDir, file);
-          const stat = fs.statSync(fullPath);
-          if (stat.isFile()) {
-            skills.push(parseSkillFile(fullPath, 'global'));
-          }
-        }
-      }
-    }
-
-    // Project skills from <projectPath>/.claude/commands/
-    if (projectPath) {
-      const projectCommandsDir = path.join(projectPath, '.claude', 'commands');
-      if (fs.existsSync(projectCommandsDir)) {
-        const files = fs.readdirSync(projectCommandsDir);
-        for (const file of files) {
-          const ext = path.extname(file);
-          if (ext === '.md' || ext === '.sh') {
-            const fullPath = path.join(projectCommandsDir, file);
+          try {
             const stat = fs.statSync(fullPath);
-            if (stat.isFile()) {
-              skills.push(parseSkillFile(fullPath, 'project'));
+            if (stat.isFile() || stat.isSymbolicLink()) {
+              skills.push(parseSkillFile(fullPath, 'global'));
             }
+          } catch {
+            // Skip broken symlinks etc.
           }
         }
       }
