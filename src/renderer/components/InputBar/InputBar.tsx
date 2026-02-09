@@ -375,15 +375,15 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
   const projectPath = currentProject.path;
 
   return (
-    <div className="shrink-0 bg-bg px-4 py-3 relative">
-      {/* Resize handle — sits above the input box */}
-      <div
-        onMouseDown={handleResizeMouseDown}
-        className="absolute top-0 left-8 right-8 h-3 cursor-row-resize z-20 group flex items-center justify-center"
-      >
-        <div className="w-10 h-[3px] rounded-full bg-border opacity-0 group-hover:opacity-60 transition-opacity" />
-      </div>
+    <div className="shrink-0 bg-bg px-4 py-3">
       <div className={chatLayout === 'full-width' ? 'w-full px-2' : 'max-w-3xl mx-auto'}>
+        {/* Resize handle — above the input box border */}
+        <div
+          onMouseDown={(e) => { console.log('[resize] mousedown'); handleResizeMouseDown(e); }}
+          className="flex items-center justify-center h-4 cursor-row-resize group"
+        >
+          <div className="w-12 h-[3px] rounded-full bg-border group-hover:bg-text-muted transition-colors" />
+        </div>
         <div className="relative flex flex-col bg-surface rounded-xl border border-border focus-within:border-border-light transition-colors">
           {/* @ File search popup */}
           <FileSearchPopup
