@@ -42,6 +42,7 @@ export function SkillsSection() {
   };
 
   const handleRemove = async (skill: SkillInfo) => {
+    if (!confirm(`Remove skill "${skill.name}"? This will delete the entire directory.`)) return;
     const ok = await window.api.skills.remove(skill.dirPath);
     if (ok) {
       loadSkills();

@@ -113,7 +113,11 @@ export function McpServersSection() {
                   </svg>
                 </button>
                 <button
-                  onClick={() => removeMcpServer(server.id)}
+                  onClick={() => {
+                    if (confirm(`Remove MCP server "${server.name}"?`)) {
+                      removeMcpServer(server.id);
+                    }
+                  }}
                   className="p-1.5 rounded text-text-muted hover:text-error
                              hover:bg-surface-hover transition-colors"
                   title="Remove"

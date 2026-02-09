@@ -97,6 +97,7 @@ export function CommandsSection() {
   };
 
   const handleRemove = async (cmd: CommandInfo) => {
+    if (!confirm(`Remove command "/${cmd.name}"? This will delete ${cmd.fileName}.`)) return;
     const ok = await window.api.commands.remove(cmd.filePath);
     if (ok) {
       loadCommands();
