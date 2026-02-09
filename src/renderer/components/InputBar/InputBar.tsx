@@ -441,7 +441,7 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
             placeholder="Ask Claude anything, @ to add files, / for commands"
             rows={2}
             style={{ height: `${inputHeight}px` }}
-            className="flex-1 bg-transparent text-sm text-text-primary placeholder-text-muted
+            className="bg-transparent text-sm text-text-primary placeholder-text-muted
                        px-3 py-2.5 resize-none outline-none overflow-y-auto"
           />
 
