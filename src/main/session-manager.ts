@@ -127,16 +127,19 @@ class SessionManager {
   }
 
   /**
-   * Clean up IDE-generated prompts like <ide_opened_file>...</ide_opened_file>
+   * Clean up IDE-generated tags from prompts:
+   * - <ide_opened_file>...</ide_opened_file>
+   * - <ide_selection>...</ide_selection>
+   * - <ide_viewport>...</ide_viewport>
    * Also handles unclosed/truncated tags.
    * Returns empty string if the entire content is IDE tags.
    */
   private cleanPrompt(prompt: string): string {
     if (!prompt) return '';
-    // Strip complete <ide_opened_file>...</ide_opened_file> tags
-    let cleaned = prompt.replace(/<ide_opened_file>[\s\S]*?<\/ide_opened_file>/g, '').trim();
-    // Strip unclosed/truncated <ide_opened_file>... (no closing tag)
-    cleaned = cleaned.replace(/<ide_opened_file>[\s\S]*/g, '').trim();
+    // Strip complete IDE tags (closed)
+    let cleaned = prompt.replace(/<ide_[a-z_]+>[\s\S]*?<\/ide_[a-z_]+>/g, '').trim();
+    // Strip unclosed/truncated IDE tags
+    cleaned = cleaned.replace(/<ide_[a-z_]+>[\s\S]*/g, '').trim();
     return cleaned;
   }
 
