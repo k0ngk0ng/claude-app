@@ -206,6 +206,108 @@ export function registerIpcHandlers(): void {
     }
   });
 
+  ipcMain.handle('app:checkForUpdates', async () => {
+    try {
+      const https = require('https');
+      const data: string = await new Promise((resolve, reject) => {
+        https.get('https://api.github.com/repos/k0ngk0ng/claude-app/releases/latest', {
+          headers: { 'User-Agent': 'claude-app', 'Accept': 'application/vnd.github.v3+json' },
+        }, (res: any) => {
+          let body = '';
+          res.on('data', (chunk: string) => { body += chunk; });
+          res.on('end', () => resolve(body));
+          res.on('error', reject);
+        }).on('error', reject);
+      });
+      const release = JSON.parse(data);
+      return {
+        version: (release.tag_name || '').replace(/^v/, ''),
+        tagName: release.tag_name,
+        name: release.name,
+        body: release.body,
+        htmlUrl: release.html_url,
+        assets: (release.assets || []).map((a: any) => ({
+          name: a.name,
+          size: a.size,
+          downloadUrl: a.browser_download_url,
+        })),
+      };
+    } catch (err: any) {
+      throw new Error(`Failed to check for updates: ${err?.message}`);
+    }
+  });
+
+  ipcMain.handle('app:downloadUpdate', async (_event, downloadUrl: string, fileName: string) => {
+    const https = require('https');
+    const downloadDir = path.join(os.homedir(), 'Downloads');
+    const filePath = path.join(downloadDir, fileName);
+    const wc = getWebContents();
+
+    return new Promise<string>((resolve, reject) => {
+      const follow = (url: string) => {
+        https.get(url, {
+          headers: { 'User-Agent': 'claude-app' },
+        }, (res: any) => {
+          // Follow redirects
+          if (res.statusCode === 301 || res.statusCode === 302) {
+            follow(res.headers.location);
+            return;
+          }
+          if (res.statusCode !== 200) {
+            reject(new Error(`Download failed: HTTP ${res.statusCode}`));
+            return;
+          }
+
+          const totalSize = parseInt(res.headers['content-length'] || '0', 10);
+          let downloaded = 0;
+          const fileStream = fs.createWriteStream(filePath);
+
+          res.on('data', (chunk: Buffer) => {
+            downloaded += chunk.length;
+            fileStream.write(chunk);
+            if (wc && totalSize > 0) {
+              const progress = Math.round((downloaded / totalSize) * 100);
+              wc.send('app:download-progress', { downloaded, totalSize, progress });
+            }
+          });
+
+          res.on('end', () => {
+            fileStream.end();
+            resolve(filePath);
+          });
+
+          res.on('error', (err: Error) => {
+            fileStream.end();
+            try { fs.unlinkSync(filePath); } catch {}
+            reject(err);
+          });
+        }).on('error', reject);
+      };
+      follow(downloadUrl);
+    });
+  });
+
+  ipcMain.handle('app:installUpdate', async (_event, filePath: string) => {
+    try {
+      const platform = getPlatform();
+      if (platform === 'mac') {
+        // Open the .dmg or .zip file
+        await shell.openPath(filePath);
+      } else if (platform === 'windows') {
+        // Run the installer
+        await shell.openPath(filePath);
+      } else {
+        // Linux: open the file
+        await shell.openPath(filePath);
+      }
+      // Quit the app so user can install
+      setTimeout(() => app.quit(), 1000);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+
   ipcMain.handle('app:getModel', () => {
     return getClaudeModel();
   });

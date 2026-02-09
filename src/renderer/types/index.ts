@@ -69,6 +69,18 @@ export interface AppAPI {
   toggleDevTools: () => Promise<void>;
   showItemInFolder: (fullPath: string) => Promise<boolean>;
   openFile: (fullPath: string) => Promise<boolean>;
+  checkForUpdates: () => Promise<{
+    version: string;
+    tagName: string;
+    name: string;
+    body: string;
+    htmlUrl: string;
+    assets: { name: string; size: number; downloadUrl: string }[];
+  }>;
+  downloadUpdate: (downloadUrl: string, fileName: string) => Promise<string>;
+  installUpdate: (filePath: string) => Promise<boolean>;
+  onDownloadProgress: (callback: (data: { downloaded: number; totalSize: number; progress: number }) => void) => void;
+  removeDownloadProgressListener: (callback: (data: { downloaded: number; totalSize: number; progress: number }) => void) => void;
 }
 
 export interface ClaudeConfigAPI {
@@ -210,7 +222,8 @@ export type SettingsTab =
   | 'mcp-servers'
   | 'git'
   | 'appearance'
-  | 'keybindings';
+  | 'keybindings'
+  | 'about';
 
 export type ThemeMode = 'dark' | 'light' | 'system';
 export type PermissionMode = 'default' | 'acceptEdits' | 'plan' | 'bypassPermissions' | 'dontAsk';

@@ -123,6 +123,28 @@ export function SettingsNav() {
             <span>{item.label}</span>
           </button>
         ))}
+
+        {/* Separator + About */}
+        <div className="border-t border-border my-2" />
+        <button
+          onClick={() => setActiveTab('about')}
+          className={`flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm
+                      transition-colors duration-150 titlebar-no-drag
+                      ${
+                        activeTab === 'about'
+                          ? 'bg-surface text-text-primary'
+                          : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover'
+                      }`}
+        >
+          <span className="shrink-0 opacity-80">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.3" />
+              <path d="M8 7v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <circle cx="8" cy="5" r="0.75" fill="currentColor" />
+            </svg>
+          </span>
+          <span>About</span>
+        </button>
       </div>
     </nav>
   );

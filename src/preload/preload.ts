@@ -85,12 +85,25 @@ export interface AppAPI {
   toggleDevTools: () => Promise<void>;
   showItemInFolder: (fullPath: string) => Promise<boolean>;
   openFile: (fullPath: string) => Promise<boolean>;
+  checkForUpdates: () => Promise<{
+    version: string;
+    tagName: string;
+    name: string;
+    body: string;
+    htmlUrl: string;
+    assets: { name: string; size: number; downloadUrl: string }[];
+  }>;
+  downloadUpdate: (downloadUrl: string, fileName: string) => Promise<string>;
+  installUpdate: (filePath: string) => Promise<boolean>;
+  onDownloadProgress: (callback: (data: { downloaded: number; totalSize: number; progress: number }) => void) => void;
+  removeDownloadProgressListener: (callback: (data: { downloaded: number; totalSize: number; progress: number }) => void) => void;
 }
 
 const claudeMessageListeners = new Map<Function, (...args: any[]) => void>();
 const claudePermissionListeners = new Map<Function, (...args: any[]) => void>();
 const terminalDataListeners = new Map<Function, (...args: any[]) => void>();
 const installProgressListeners = new Map<Function, (...args: any[]) => void>();
+const downloadProgressListeners = new Map<Function, (...args: any[]) => void>();
 const sessionsChangedListeners = new Map<Function, (...args: any[]) => void>();
 
 contextBridge.exposeInMainWorld('api', {
@@ -243,6 +256,23 @@ contextBridge.exposeInMainWorld('api', {
     toggleDevTools: () => ipcRenderer.invoke('app:toggleDevTools'),
     showItemInFolder: (fullPath: string) => ipcRenderer.invoke('app:showItemInFolder', fullPath),
     openFile: (fullPath: string) => ipcRenderer.invoke('app:openFile', fullPath),
+    checkForUpdates: () => ipcRenderer.invoke('app:checkForUpdates'),
+    downloadUpdate: (downloadUrl: string, fileName: string) => ipcRenderer.invoke('app:downloadUpdate', downloadUrl, fileName),
+    installUpdate: (filePath: string) => ipcRenderer.invoke('app:installUpdate', filePath),
+    onDownloadProgress: (callback: (data: { downloaded: number; totalSize: number; progress: number }) => void) => {
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, data: { downloaded: number; totalSize: number; progress: number }) => {
+        callback(data);
+      };
+      downloadProgressListeners.set(callback, wrappedCallback);
+      ipcRenderer.on('app:download-progress', wrappedCallback);
+    },
+    removeDownloadProgressListener: (callback: (data: { downloaded: number; totalSize: number; progress: number }) => void) => {
+      const wrappedCallback = downloadProgressListeners.get(callback);
+      if (wrappedCallback) {
+        ipcRenderer.removeListener('app:download-progress', wrappedCallback);
+        downloadProgressListeners.delete(callback);
+      }
+    },
   } satisfies AppAPI,
 
   claudeConfig: {
