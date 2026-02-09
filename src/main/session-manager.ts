@@ -154,7 +154,27 @@ class SessionManager {
       for (const entry of entries) {
         if (entry.isDirectory()) {
           const encodedPath = entry.name;
-          const decodedPath = decodePath(encodedPath);
+
+          // Try to get the real projectPath from sessions-index.json first
+          let realPath = '';
+          try {
+            const indexPath = path.join(this.sessionsDir, encodedPath, 'sessions-index.json');
+            const content = fs.readFileSync(indexPath, 'utf-8');
+            const parsed = JSON.parse(content);
+            const indexEntries = Array.isArray(parsed.entries) ? parsed.entries : (Array.isArray(parsed) ? parsed : []);
+            // Use the first entry's projectPath as the canonical path
+            for (const e of indexEntries) {
+              if (e.projectPath) {
+                realPath = e.projectPath;
+                break;
+              }
+            }
+          } catch {
+            // No sessions-index.json or unreadable
+          }
+
+          // Fallback to decodePath if no projectPath found in index
+          const decodedPath = realPath || decodePath(encodedPath);
           const projectName = path.basename(decodedPath);
           projects.push({
             name: projectName,
@@ -336,18 +356,62 @@ class SessionManager {
     return allSessions;
   }
 
-  getSessionMessages(projectPath: string, sessionId: string): MessageEntry[] {
+  /**
+   * Find the encoded directory name for a given projectPath.
+   * Strategy:
+   * 1. Try encodePath() directly (works for paths without spaces/special chars)
+   * 2. Scan all project directories and check their sessions-index.json for matching projectPath
+   * 3. Try the projectPath as-is (might already be an encoded dir name)
+   */
+  private findEncodedDir(projectPath: string): string | null {
+    // 1. Try simple encode
     const encoded = encodePath(projectPath);
-    const sessionFile = path.join(this.sessionsDir, encoded, `${sessionId}.jsonl`);
-
-    // Try encoded path first, then try projectPath as-is (it might already be encoded dir name)
-    let filePath = sessionFile;
-    if (!fs.existsSync(filePath)) {
-      const altPath = path.join(this.sessionsDir, projectPath, `${sessionId}.jsonl`);
-      if (fs.existsSync(altPath)) {
-        filePath = altPath;
-      }
+    const encodedDir = path.join(this.sessionsDir, encoded);
+    if (fs.existsSync(encodedDir)) {
+      return encoded;
     }
+
+    // 2. Scan all project dirs, read sessions-index.json for projectPath match
+    try {
+      const entries = fs.readdirSync(this.sessionsDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        const indexPath = path.join(this.sessionsDir, entry.name, 'sessions-index.json');
+        try {
+          const content = fs.readFileSync(indexPath, 'utf-8');
+          const parsed = JSON.parse(content);
+          const indexEntries = Array.isArray(parsed.entries) ? parsed.entries : (Array.isArray(parsed) ? parsed : []);
+          // Check if any entry's projectPath matches
+          for (const e of indexEntries) {
+            if (e.projectPath === projectPath) {
+              return entry.name;
+            }
+          }
+        } catch {
+          // Skip unreadable index files
+        }
+      }
+    } catch {
+      // sessionsDir doesn't exist
+    }
+
+    // 3. Try as-is
+    const directDir = path.join(this.sessionsDir, projectPath);
+    if (fs.existsSync(directDir)) {
+      return projectPath;
+    }
+
+    return null;
+  }
+
+  getSessionMessages(projectPath: string, sessionId: string): MessageEntry[] {
+    const encodedDir = this.findEncodedDir(projectPath);
+    if (!encodedDir) {
+      console.error(`Could not find session directory for: ${projectPath}`);
+      return [];
+    }
+
+    const filePath = path.join(this.sessionsDir, encodedDir, `${sessionId}.jsonl`);
 
     try {
       const content = fs.readFileSync(filePath, 'utf-8');
