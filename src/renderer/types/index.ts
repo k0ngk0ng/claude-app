@@ -1,7 +1,7 @@
 // ─── API types exposed via preload ──────────────────────────────────
 
 export interface ClaudeAPI {
-  spawn: (cwd: string, sessionId?: string, permissionMode?: string, envVars?: Array<{ key: string; value: string; enabled: boolean }>) => Promise<string>;
+  spawn: (cwd: string, sessionId?: string, permissionMode?: string, envVars?: Array<{ key: string; value: string; enabled: boolean }>, language?: string) => Promise<string>;
   send: (processId: string, content: string) => Promise<boolean>;
   kill: (processId: string) => Promise<boolean>;
   onMessage: (callback: (processId: string, message: ClaudeStreamEvent) => void) => void;
@@ -37,6 +37,7 @@ export interface GitAPI {
   checkout: (cwd: string, branch: string) => Promise<string>;
   createBranch: (cwd: string, branch: string) => Promise<string>;
   searchFiles: (cwd: string, query: string) => Promise<{ name: string; path: string }[]>;
+  listFiles: (cwd: string) => Promise<string[]>;
   push: (cwd: string) => Promise<string>;
   pushTags: (cwd: string) => Promise<string>;
 }
