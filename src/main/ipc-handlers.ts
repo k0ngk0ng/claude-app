@@ -210,11 +210,13 @@ export function registerIpcHandlers(): void {
     // Try 1: run `claude --version` from the global CLI
     try {
       const claudePath = getClaudeBinary();
-      const version = execSync(`${claudePath} --version`, {
+      const raw = execSync(`${claudePath} --version`, {
         encoding: 'utf-8',
         timeout: 5000,
         stdio: ['pipe', 'pipe', 'pipe'],
       }).trim();
+      // Output is like "2.1.33 (Claude Code)" — extract just the version number
+      const version = raw.split(/\s/)[0];
       if (version) return version;
     } catch {
       // fall through
