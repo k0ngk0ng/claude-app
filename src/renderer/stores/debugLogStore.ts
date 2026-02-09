@@ -59,15 +59,12 @@ export function debugLog(
   detail?: unknown,
   level: 'info' | 'warn' | 'error' = 'info'
 ) {
-  // Check if debug mode is enabled (lazy import to avoid circular deps)
+  // Check if debug mode is enabled by importing settingsStore lazily
   try {
-    const settingsRaw = localStorage.getItem('claude-app-settings');
-    if (settingsRaw) {
-      const settings = JSON.parse(settingsRaw);
-      if (!settings.general?.debugMode) return;
-    } else {
-      return; // No settings = debug off by default
-    }
+    // Use dynamic require to avoid circular dependency at module load time
+    const { useSettingsStore } = require('./settingsStore');
+    const debugMode = useSettingsStore.getState().settings.general.debugMode;
+    if (!debugMode) return;
   } catch {
     return;
   }

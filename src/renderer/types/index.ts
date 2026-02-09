@@ -75,6 +75,11 @@ export interface ClaudeConfigAPI {
   write: (updates: Record<string, unknown>) => Promise<boolean>;
 }
 
+export interface SettingsFileAPI {
+  read: () => Promise<Record<string, unknown> | null>;
+  write: (data: Record<string, unknown>) => Promise<boolean>;
+}
+
 export interface WindowAPI {
   claude: ClaudeAPI;
   sessions: SessionsAPI;
@@ -82,6 +87,7 @@ export interface WindowAPI {
   terminal: TerminalAPI;
   app: AppAPI;
   claudeConfig: ClaudeConfigAPI;
+  settings: SettingsFileAPI;
 }
 
 export interface DependencyStatus {

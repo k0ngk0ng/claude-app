@@ -7,6 +7,7 @@ import type {
   ProviderSettings,
   ProviderEnvVar,
   PermissionSettings,
+  PermissionMode,
   McpServer,
   GitSettings,
   AppearanceSettings,
@@ -68,55 +69,74 @@ const defaultSettings: AppSettings = {
 };
 
 function saveSettings(settings: AppSettings) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  } catch {
-    // Ignore storage errors
-  }
+  // Fire-and-forget write to ~/.claude-app/settings.json
+  window.api.settings.write(settings as unknown as Record<string, unknown>).catch(() => {
+    // Ignore write errors
+  });
 }
 
-function loadSettings(): AppSettings {
+function mergeWithDefaults(parsed: Record<string, unknown>): AppSettings {
+  // Migrate old 'model' key to 'provider' for backward compatibility
+  const providerSource = (parsed.provider || parsed.model || {}) as Record<string, unknown>;
+
+  // Deep merge with defaults to handle new settings added in updates
+  const settings: AppSettings = {
+    general: { ...defaultSettings.general, ...(parsed.general as Partial<GeneralSettings>) },
+    provider: {
+      ...defaultSettings.provider,
+      ...(providerSource as Partial<ProviderSettings>),
+      envVars: (providerSource.envVars as ProviderEnvVar[]) || defaultSettings.provider.envVars,
+    },
+    permissions: { ...defaultSettings.permissions, ...(parsed.permissions as Partial<PermissionSettings>) },
+    mcpServers: (parsed.mcpServers as McpServer[]) || defaultSettings.mcpServers,
+    git: { ...defaultSettings.git, ...(parsed.git as Partial<GitSettings>) },
+    appearance: { ...defaultSettings.appearance, ...(parsed.appearance as Partial<AppearanceSettings>) },
+    keybindings: (parsed.keybindings as KeyBinding[])?.length ? (parsed.keybindings as KeyBinding[]) : defaultSettings.keybindings,
+  };
+
+  // Migrate old autoApprove values to new permission mode values
+  const modeMap: Record<string, string> = {
+    'suggest': 'acceptEdits',
+    'auto-edit': 'acceptEdits',
+    'full-auto': 'bypassPermissions',
+    'default': 'acceptEdits',
+  };
+  const validModes = ['acceptEdits', 'plan', 'bypassPermissions', 'dontAsk'];
+  if (!validModes.includes(settings.general.autoApprove)) {
+    settings.general.autoApprove = (modeMap[settings.general.autoApprove] || 'acceptEdits') as PermissionMode;
+  }
+
+  return settings;
+}
+
+/** Load settings from file, migrating from localStorage on first run */
+async function loadSettingsFromFile(): Promise<AppSettings> {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-
-      // Migrate old 'model' key to 'provider' for backward compatibility
-      const providerSource = parsed.provider || parsed.model || {};
-
-      // Deep merge with defaults to handle new settings added in updates
-      const settings: AppSettings = {
-        general: { ...defaultSettings.general, ...parsed.general },
-        provider: {
-          ...defaultSettings.provider,
-          ...providerSource,
-          envVars: providerSource.envVars || defaultSettings.provider.envVars,
-        },
-        permissions: { ...defaultSettings.permissions, ...parsed.permissions },
-        mcpServers: parsed.mcpServers || defaultSettings.mcpServers,
-        git: { ...defaultSettings.git, ...parsed.git },
-        appearance: { ...defaultSettings.appearance, ...parsed.appearance },
-        keybindings: parsed.keybindings?.length ? parsed.keybindings : defaultSettings.keybindings,
-      };
-
-      // Migrate old autoApprove values to new permission mode values
-      const modeMap: Record<string, string> = {
-        'suggest': 'acceptEdits',
-        'auto-edit': 'acceptEdits',
-        'full-auto': 'bypassPermissions',
-        'default': 'acceptEdits',
-      };
-      const validModes = ['acceptEdits', 'plan', 'bypassPermissions', 'dontAsk'];
-      if (!validModes.includes(settings.general.autoApprove)) {
-        settings.general.autoApprove = (modeMap[settings.general.autoApprove] || 'acceptEdits') as any;
-        // Persist the migration
-        saveSettings(settings);
-      }
-
+    const fileData = await window.api.settings.read();
+    if (fileData) {
+      const settings = mergeWithDefaults(fileData);
+      // Re-persist in case migrations changed anything
+      saveSettings(settings);
       return settings;
     }
+
+    // No file yet — check localStorage for data to migrate
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const settings = mergeWithDefaults(parsed);
+        // Write migrated data to file
+        saveSettings(settings);
+        // Clean up localStorage
+        localStorage.removeItem(STORAGE_KEY);
+        return settings;
+      }
+    } catch {
+      // Ignore localStorage errors
+    }
   } catch {
-    // Ignore parse errors
+    // Ignore file read errors
   }
   return { ...defaultSettings };
 }
@@ -160,7 +180,7 @@ interface SettingsStore {
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
   isOpen: false,
   activeTab: 'general',
-  settings: loadSettings(),
+  settings: { ...defaultSettings },
 
   openSettings: () => set({ isOpen: true, activeTab: 'general' }),
   closeSettings: () => set({ isOpen: false }),
@@ -348,3 +368,8 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     });
   },
 }));
+
+// Async initialization: load settings from file (migrating from localStorage if needed)
+loadSettingsFromFile().then((settings) => {
+  useSettingsStore.setState({ settings });
+});

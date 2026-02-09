@@ -437,6 +437,34 @@ export function registerIpcHandlers(): void {
     return true;
   });
 
+  // ─── App Settings (~/.claude-app/settings.json) ──────────────────
+  const settingsDir = path.join(os.homedir(), '.claude-app');
+  const settingsFile = path.join(settingsDir, 'settings.json');
+
+  ipcMain.handle('settings:read', async () => {
+    try {
+      if (!fs.existsSync(settingsFile)) {
+        return null;
+      }
+      const raw = fs.readFileSync(settingsFile, 'utf-8');
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  });
+
+  ipcMain.handle('settings:write', async (_event, data: Record<string, unknown>) => {
+    try {
+      if (!fs.existsSync(settingsDir)) {
+        fs.mkdirSync(settingsDir, { recursive: true });
+      }
+      fs.writeFileSync(settingsFile, JSON.stringify(data, null, 2), 'utf-8');
+      return true;
+    } catch {
+      return false;
+    }
+  });
+
   // ─── Git push ─────────────────────────────────────────────────────
   ipcMain.handle('git:push', async (_event, cwd: string) => {
     return gitManager.push(cwd);

@@ -62,6 +62,11 @@ export interface ClaudeConfigAPI {
   write: (updates: Record<string, unknown>) => Promise<boolean>;
 }
 
+export interface SettingsFileAPI {
+  read: () => Promise<Record<string, unknown> | null>;
+  write: (data: Record<string, unknown>) => Promise<boolean>;
+}
+
 export interface AppAPI {
   getProjectPath: () => Promise<string>;
   selectDirectory: () => Promise<string | null>;
@@ -242,4 +247,9 @@ contextBridge.exposeInMainWorld('api', {
     read: () => ipcRenderer.invoke('claudeConfig:read'),
     write: (updates: Record<string, unknown>) => ipcRenderer.invoke('claudeConfig:write', updates),
   } satisfies ClaudeConfigAPI,
+
+  settings: {
+    read: () => ipcRenderer.invoke('settings:read'),
+    write: (data: Record<string, unknown>) => ipcRenderer.invoke('settings:write', data),
+  } satisfies SettingsFileAPI,
 });
