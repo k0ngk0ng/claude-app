@@ -712,6 +712,9 @@ export function useClaude() {
       const providerSettings = useSettingsStore.getState().settings.provider;
       const envVars = providerSettings.envVars.filter((v) => v.enabled && v.key && v.value);
 
+      // Read language setting
+      const language = useSettingsStore.getState().settings.general.language || 'auto';
+
       debugLog('claude', `spawning SDK session — cwd: ${cwd}${sessionId ? ', resume: ' + sessionId : ''}, mode: ${mode}, envVars: ${envVars.length}`, {
         cwd,
         sessionId,
@@ -732,7 +735,7 @@ export function useClaude() {
       // Clear any pending permission requests from previous session
       usePermissionStore.getState().clearRequests();
 
-      const pid = await window.api.claude.spawn(cwd, sessionId, mode, envVars);
+      const pid = await window.api.claude.spawn(cwd, sessionId, mode, envVars, language);
       processIdRef.current = pid;
       useAppStore.getState().setProcessId(pid);
       useAppStore.getState().setIsStreaming(false);

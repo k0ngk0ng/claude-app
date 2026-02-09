@@ -32,6 +32,27 @@ export function GeneralSection() {
           ]}
         />
 
+        {/* Language */}
+        <SettingsSelect
+          label="Response language"
+          description="Set the language Claude uses to respond. 'Auto' follows your input language."
+          value={general.language}
+          onChange={(v) => updateGeneral({ language: v })}
+          options={[
+            { value: 'auto', label: 'Auto (follow input language)' },
+            { value: 'en', label: 'English' },
+            { value: 'zh-CN', label: '简体中文' },
+            { value: 'zh-TW', label: '繁體中文' },
+            { value: 'ja', label: '日本語' },
+            { value: 'ko', label: '한국어' },
+            { value: 'es', label: 'Español' },
+            { value: 'fr', label: 'Français' },
+            { value: 'de', label: 'Deutsch' },
+            { value: 'pt', label: 'Português' },
+            { value: 'ru', label: 'Русский' },
+          ]}
+        />
+
         {/* Permission mode */}
         <SettingsSelect
           label="Permission mode"

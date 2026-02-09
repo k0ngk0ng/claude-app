@@ -126,6 +126,7 @@ interface ManagedSession {
   cwd: string;
   sessionId?: string;
   permissionMode?: string;
+  language?: string;
   abortController: AbortController;
   permissionResolvers: Map<string, (result: PermissionResponse) => void>;
   queryInstance?: any; // SDK Query object — has setPermissionMode(), interrupt(), etc.
@@ -145,8 +146,9 @@ class ClaudeProcessManager extends EventEmitter {
     sessionId?: string,
     permissionMode?: string,
     envVars?: Array<{ key: string; value: string; enabled: boolean }>,
+    language?: string,
   ): Promise<string> {
-    debugLog('spawn called — cwd:', cwd, 'sessionId:', sessionId, 'permissionMode:', permissionMode, 'envVars:', envVars?.length || 0);
+    debugLog('spawn called — cwd:', cwd, 'sessionId:', sessionId, 'permissionMode:', permissionMode, 'envVars:', envVars?.length || 0, 'language:', language);
 
     // Apply enabled env vars to process.env so the SDK child process inherits them
     if (envVars && envVars.length > 0) {
@@ -165,6 +167,7 @@ class ClaudeProcessManager extends EventEmitter {
       cwd,
       sessionId,
       permissionMode,
+      language,
       abortController,
       permissionResolvers: new Map(),
     };
@@ -185,13 +188,33 @@ class ClaudeProcessManager extends EventEmitter {
   ) {
     const query = await getQuery();
 
+    // Build language instruction for system prompt
+    const langMap: Record<string, string> = {
+      'zh-CN': 'Simplified Chinese (简体中文)',
+      'zh-TW': 'Traditional Chinese (繁體中文)',
+      'ja': 'Japanese (日本語)',
+      'ko': 'Korean (한국어)',
+      'en': 'English',
+      'es': 'Spanish (Español)',
+      'fr': 'French (Français)',
+      'de': 'German (Deutsch)',
+      'pt': 'Portuguese (Português)',
+      'ru': 'Russian (Русский)',
+    };
+    const lang = managed.language && managed.language !== 'auto' ? managed.language : '';
+    const langInstruction = lang && langMap[lang]
+      ? `IMPORTANT: Always respond in ${langMap[lang]}. All explanations, comments, and conversation must be in ${langMap[lang]}.`
+      : '';
+
     // Build options
     const options: Record<string, unknown> = {
       cwd: managed.cwd,
       abortController: managed.abortController,
       includePartialMessages: true,
       settingSources: ['user', 'project', 'local'],
-      systemPrompt: { type: 'preset', preset: 'claude_code' },
+      systemPrompt: langInstruction
+        ? { type: 'preset', preset: 'claude_code', append: langInstruction }
+        : { type: 'preset', preset: 'claude_code' },
       pathToClaudeCodeExecutable: getSdkCliPath(),
       // Capture stderr for debugging — must be a callback function
       stderr: (data: string) => {

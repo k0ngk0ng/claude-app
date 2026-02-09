@@ -19,6 +19,7 @@ const defaultSettings: AppSettings = {
   general: {
     sendKey: 'enter',
     autoApprove: 'acceptEdits',
+    language: 'auto',
     showCostInfo: true,
     notifyOnComplete: true,
     preventSleep: false,

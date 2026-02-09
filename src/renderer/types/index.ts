@@ -210,6 +210,7 @@ export type SendKeyMode = 'enter' | 'cmd-enter';
 export interface GeneralSettings {
   sendKey: SendKeyMode;
   autoApprove: PermissionMode;
+  language: string;
   showCostInfo: boolean;
   notifyOnComplete: boolean;
   preventSleep: boolean;
