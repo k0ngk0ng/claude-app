@@ -385,12 +385,16 @@ class SessionManager {
         // Always read firstPrompt from JSONL file (not from sessions-index.json)
         const jsonlPath = path.join(projectDir, `${session.sessionId}.jsonl`);
         const firstPrompt = this.readFirstPromptFromJsonl(jsonlPath);
+        const title = this.cleanPrompt(session.summary || firstPrompt.slice(0, 80) || '');
+
+        // Skip sessions with no useful prompt (e.g. only file-history-snapshot entries)
+        if (!title) continue;
 
         allSessions.push({
           id: session.sessionId,
           projectPath: resolvedPath,
           projectName: resolvedName,
-          title: this.cleanPrompt(session.summary || firstPrompt.slice(0, 80) || 'Untitled'),
+          title,
           lastMessage: this.cleanPrompt(firstPrompt),
           updatedAt: session.modified || session.created || '',
         });
