@@ -58,19 +58,16 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
     e.stopPropagation();
     const startY = e.clientY;
     const startHeight = inputHeight;
-    console.log('[resize] start', { startY, startHeight });
 
     const handleMouseMove = (ev: MouseEvent) => {
       ev.preventDefault();
       const delta = startY - ev.clientY;
       const maxH = Math.floor(window.innerHeight * 0.5);
       const newHeight = Math.max(64, Math.min(maxH, startHeight + delta));
-      console.log('[resize] move', { clientY: ev.clientY, delta, newHeight });
       setInputHeight(newHeight);
     };
 
     const handleMouseUp = () => {
-      console.log('[resize] end');
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
       document.removeEventListener('mousemove', handleMouseMove);
@@ -381,7 +378,7 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
       <div className={chatLayout === 'full-width' ? 'w-full px-2' : 'max-w-3xl mx-auto'}>
         {/* Resize handle — above the input box border */}
         <div
-          onMouseDown={(e) => { console.log('[resize] mousedown'); handleResizeMouseDown(e); }}
+          onMouseDown={handleResizeMouseDown}
           className="flex items-center justify-center h-4 cursor-row-resize group"
         >
           <div className="w-12 h-[3px] rounded-full bg-border group-hover:bg-text-muted transition-colors" />
