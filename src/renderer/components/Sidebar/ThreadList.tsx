@@ -150,23 +150,6 @@ export function ThreadList() {
                 <span className="text-[10px] text-text-muted opacity-0 group-hover:opacity-100 transition-opacity">
                   {group.sessions.length}
                 </span>
-                <svg
-                  width="10"
-                  height="10"
-                  viewBox="0 0 10 10"
-                  fill="none"
-                  className={`shrink-0 opacity-40 transition-transform duration-150 ${
-                    isCollapsed ? '-rotate-90' : ''
-                  }`}
-                >
-                  <path
-                    d="M3 4l2 2 2-2"
-                    stroke="currentColor"
-                    strokeWidth="1.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
               </button>
               {/* New thread button */}
               <button
@@ -181,6 +164,30 @@ export function ThreadList() {
               >
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                   <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </button>
+              {/* Collapse chevron */}
+              <button
+                onClick={() => toggleProject(key)}
+                className="shrink-0 p-1 rounded text-text-muted hover:text-text-primary
+                           hover:bg-surface-hover transition-colors"
+              >
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 10 10"
+                  fill="none"
+                  className={`opacity-40 transition-transform duration-150 ${
+                    isCollapsed ? '-rotate-90' : ''
+                  }`}
+                >
+                  <path
+                    d="M3 4l2 2 2-2"
+                    stroke="currentColor"
+                    strokeWidth="1.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
               </button>
             </div>
