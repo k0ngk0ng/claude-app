@@ -159,9 +159,9 @@ export default function App() {
 
       // Start a new process if we don't have one
       if (!state.currentSession.processId) {
-        // Only pass sessionId for resume if this is a session we want to continue
-        // Don't pass it for sessions loaded from disk history — start fresh
-        await startSession(projectPath, undefined, permissionMode);
+        // Pass sessionId to resume if this session has one (e.g. forked thread)
+        const sessionId = state.currentSession.id || undefined;
+        await startSession(projectPath, sessionId, permissionMode);
       }
 
       await sendMessage(content);

@@ -56,6 +56,8 @@ export interface TerminalAPI {
   kill: (id: string) => Promise<boolean>;
   onData: (callback: (id: string, data: string) => void) => void;
   removeDataListener: (callback: (id: string, data: string) => void) => void;
+  onExit: (callback: (id: string) => void) => void;
+  removeExitListener: (callback: (id: string) => void) => void;
 }
 
 export interface ClaudeConfigAPI {
@@ -141,6 +143,7 @@ export interface AppAPI {
 const claudeMessageListeners = new Map<Function, (...args: any[]) => void>();
 const claudePermissionListeners = new Map<Function, (...args: any[]) => void>();
 const terminalDataListeners = new Map<Function, (...args: any[]) => void>();
+const terminalExitListeners = new Map<Function, (...args: any[]) => void>();
 const installProgressListeners = new Map<Function, (...args: any[]) => void>();
 const downloadProgressListeners = new Map<Function, (...args: any[]) => void>();
 const sessionsChangedListeners = new Map<Function, (...args: any[]) => void>();
@@ -263,6 +266,23 @@ contextBridge.exposeInMainWorld('api', {
       if (wrappedCallback) {
         ipcRenderer.removeListener('terminal:data', wrappedCallback);
         terminalDataListeners.delete(callback);
+      }
+    },
+    onExit: (callback: (id: string) => void) => {
+      const wrappedCallback = (
+        _event: Electron.IpcRendererEvent,
+        id: string
+      ) => {
+        callback(id);
+      };
+      terminalExitListeners.set(callback, wrappedCallback);
+      ipcRenderer.on('terminal:exit', wrappedCallback);
+    },
+    removeExitListener: (callback: (id: string) => void) => {
+      const wrappedCallback = terminalExitListeners.get(callback);
+      if (wrappedCallback) {
+        ipcRenderer.removeListener('terminal:exit', wrappedCallback);
+        terminalExitListeners.delete(callback);
       }
     },
   } satisfies TerminalAPI,

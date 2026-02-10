@@ -50,6 +50,8 @@ export interface TerminalAPI {
   kill: (id: string) => Promise<boolean>;
   onData: (callback: (id: string, data: string) => void) => void;
   removeDataListener: (callback: (id: string, data: string) => void) => void;
+  onExit: (callback: (id: string) => void) => void;
+  removeExitListener: (callback: (id: string) => void) => void;
 }
 
 export interface AppAPI {

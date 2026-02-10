@@ -14,8 +14,8 @@ export function TerminalPanel({ bare, visible }: { bare?: boolean; visible?: boo
   const initializedRef = useRef(false);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
-  const cwd = currentProject.path || '/';
-  const { createTerminal, writeToTerminal, resizeTerminal, onData } =
+  const cwd = currentProject.path || '';
+  const { createTerminal, writeToTerminal, resizeTerminal, onData, onExit } =
     useTerminal(cwd);
 
   // Stable refs for callbacks so xterm wiring doesn't break
@@ -61,6 +61,8 @@ export function TerminalPanel({ bare, visible }: { bare?: boolean; visible?: boo
 
   const initTerminal = useCallback(async () => {
     if (!containerRef.current || initializedRef.current) return;
+    // Wait for a valid cwd before creating the PTY
+    if (!cwd) return;
     initializedRef.current = true;
 
     const term = new Terminal({
@@ -122,6 +124,18 @@ export function TerminalPanel({ bare, visible }: { bare?: boolean; visible?: boo
       term.write(data);
     });
 
+    // Handle shell exit (e.g. Ctrl+D) — respawn a new PTY
+    onExit(async () => {
+      term.writeln('\r\n\x1b[90m[shell exited — restarting…]\x1b[0m\r\n');
+      const newId = await createTerminal();
+      if (newId) {
+        // Re-connect PTY output → xterm
+        onData((data) => {
+          term.write(data);
+        });
+      }
+    });
+
     // Handle resize
     term.onResize(({ cols, rows }) => {
       resizeRef.current(cols, rows);
@@ -137,10 +151,11 @@ export function TerminalPanel({ bare, visible }: { bare?: boolean; visible?: boo
     });
     resizeObserver.observe(containerRef.current);
     resizeObserverRef.current = resizeObserver;
-  }, []); // No dependencies — only runs once
+  }, [cwd]); // Re-create if cwd changes (e.g. from empty to actual path)
 
-  // Initialize once on mount
+  // Initialize once cwd is available
   useEffect(() => {
+    if (!cwd) return; // Wait for valid cwd
     initTerminal();
 
     return () => {

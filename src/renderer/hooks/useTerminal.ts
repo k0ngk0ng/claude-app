@@ -3,6 +3,8 @@ import { useCallback, useEffect, useRef } from 'react';
 export function useTerminal(cwd: string) {
   const terminalIdRef = useRef<string | null>(null);
   const dataCallbackRef = useRef<((id: string, data: string) => void) | null>(null);
+  const exitCallbackRef = useRef<((id: string) => void) | null>(null);
+  const onExitHandlerRef = useRef<(() => void) | null>(null);
   const cwdRef = useRef(cwd);
   cwdRef.current = cwd;
 
@@ -18,6 +20,25 @@ export function useTerminal(cwd: string) {
 
     const id = await window.api.terminal.create(cwdRef.current);
     terminalIdRef.current = id;
+
+    // Listen for exit so we can notify the UI
+    if (id) {
+      // Remove previous exit listener
+      if (exitCallbackRef.current) {
+        window.api.terminal.removeExitListener(exitCallbackRef.current);
+      }
+      const exitCb = (exitId: string) => {
+        if (exitId === terminalIdRef.current) {
+          terminalIdRef.current = null;
+          if (onExitHandlerRef.current) {
+            onExitHandlerRef.current();
+          }
+        }
+      };
+      exitCallbackRef.current = exitCb;
+      window.api.terminal.onExit(exitCb);
+    }
+
     return id;
   }, []);
 
@@ -50,6 +71,10 @@ export function useTerminal(cwd: string) {
     []
   );
 
+  const onExit = useCallback((handler: () => void) => {
+    onExitHandlerRef.current = handler;
+  }, []);
+
   const killTerminal = useCallback(async () => {
     if (terminalIdRef.current) {
       await window.api.terminal.kill(terminalIdRef.current);
@@ -64,6 +89,10 @@ export function useTerminal(cwd: string) {
         window.api.terminal.removeDataListener(dataCallbackRef.current);
         dataCallbackRef.current = null;
       }
+      if (exitCallbackRef.current) {
+        window.api.terminal.removeExitListener(exitCallbackRef.current);
+        exitCallbackRef.current = null;
+      }
       if (terminalIdRef.current) {
         window.api.terminal.kill(terminalIdRef.current);
         terminalIdRef.current = null;
@@ -77,6 +106,7 @@ export function useTerminal(cwd: string) {
     writeToTerminal,
     resizeTerminal,
     onData,
+    onExit,
     killTerminal,
   };
 }

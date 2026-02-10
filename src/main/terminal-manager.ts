@@ -90,6 +90,14 @@ class TerminalManager {
     return id;
   }
 
+  onExit(id: string, callback: () => void): void {
+    const managed = this.terminals.get(id);
+    if (!managed) return;
+    managed.pty.onExit(() => {
+      callback();
+    });
+  }
+
   write(id: string, data: string): boolean {
     const managed = this.terminals.get(id);
     if (!managed) return false;

@@ -159,6 +159,13 @@ export function registerIpcHandlers(): void {
       }
     });
 
+    terminalManager.onExit(id, () => {
+      const wc = getWebContents();
+      if (wc) {
+        wc.send('terminal:exit', id);
+      }
+    });
+
     return id;
   });
 
