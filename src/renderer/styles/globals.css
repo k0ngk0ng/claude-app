@@ -364,7 +364,7 @@ html.light .diff-line-del {
 
 .diff-viewer-modal .d2h-file-diff {
   height: 100%;
-  overflow: auto !important;
+  overflow: hidden !important;
 }
 
 .diff-viewer-modal .d2h-files-diff {
@@ -374,8 +374,9 @@ html.light .diff-line-del {
 
 .diff-viewer-modal .d2h-file-side-diff {
   flex: 1;
-  overflow: auto;
+  overflow: auto !important;
   width: 50% !important;
+  height: 100% !important;
 }
 
 .diff-viewer-modal .d2h-code-wrapper {
@@ -392,10 +393,15 @@ html.light .diff-line-del {
   font-size: 12px;
 }
 
-/* Synchronized scroll container */
+/* Container: no scroll on outer, let side panels scroll */
 .diff-viewer-modal .d2h-side-by-side {
   display: flex;
   height: 100%;
+}
+
+.diff-viewer-modal .diff-view-container {
+  height: 100%;
+  overflow: hidden;
 }
 
 /* Transition utilities */

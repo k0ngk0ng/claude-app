@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { html as diff2htmlHtml } from 'diff2html';
 
 interface DiffViewerModalProps {
@@ -9,6 +9,7 @@ interface DiffViewerModalProps {
 
 export function DiffViewerModal({ filePath, diff, onClose }: DiffViewerModalProps) {
   const fileName = filePath.split('/').pop() || filePath;
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const htmlContent = useMemo(() => {
     if (!diff) return '';
@@ -23,6 +24,41 @@ export function DiffViewerModal({ filePath, diff, onClose }: DiffViewerModalProp
       return '';
     }
   }, [diff]);
+
+  // Synchronize scroll between left and right side-by-side panels
+  useEffect(() => {
+    if (!containerRef.current || !htmlContent) return;
+
+    const container = containerRef.current;
+    // diff2html side-by-side renders two .d2h-file-side-diff elements
+    const sides = container.querySelectorAll('.d2h-file-side-diff');
+    if (sides.length < 2) return;
+
+    const left = sides[0] as HTMLElement;
+    const right = sides[1] as HTMLElement;
+    let syncing = false;
+
+    const syncScroll = (source: HTMLElement, target: HTMLElement) => {
+      return () => {
+        if (syncing) return;
+        syncing = true;
+        target.scrollTop = source.scrollTop;
+        target.scrollLeft = source.scrollLeft;
+        syncing = false;
+      };
+    };
+
+    const leftHandler = syncScroll(left, right);
+    const rightHandler = syncScroll(right, left);
+
+    left.addEventListener('scroll', leftHandler);
+    right.addEventListener('scroll', rightHandler);
+
+    return () => {
+      left.removeEventListener('scroll', leftHandler);
+      right.removeEventListener('scroll', rightHandler);
+    };
+  }, [htmlContent]);
 
   // Close on Escape
   useEffect(() => {
@@ -62,9 +98,10 @@ export function DiffViewerModal({ filePath, diff, onClose }: DiffViewerModalProp
         </div>
 
         {/* Diff content */}
-        <div className="flex-1 overflow-auto min-h-0 diff-viewer-modal">
+        <div className="flex-1 overflow-hidden min-h-0 diff-viewer-modal">
           {htmlContent ? (
             <div
+              ref={containerRef}
               className="diff-view-container h-full"
               dangerouslySetInnerHTML={{ __html: htmlContent }}
             />
