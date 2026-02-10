@@ -343,6 +343,61 @@ html.light .diff-line-del {
   color: #cf222e;
 }
 
+/* Side-by-side diff modal styles */
+.diff-viewer-modal .d2h-file-list-wrapper {
+  display: none !important;
+}
+
+.diff-viewer-modal .d2h-wrapper {
+  height: 100%;
+}
+
+.diff-viewer-modal .d2h-file-wrapper {
+  border: none !important;
+  margin: 0 !important;
+  height: 100%;
+}
+
+.diff-viewer-modal .d2h-file-header {
+  display: none !important;
+}
+
+.diff-viewer-modal .d2h-file-diff {
+  height: 100%;
+  overflow: auto !important;
+}
+
+.diff-viewer-modal .d2h-files-diff {
+  display: flex;
+  height: 100%;
+}
+
+.diff-viewer-modal .d2h-file-side-diff {
+  flex: 1;
+  overflow: auto;
+  width: 50% !important;
+}
+
+.diff-viewer-modal .d2h-code-wrapper {
+  background: var(--color-bg) !important;
+}
+
+.diff-viewer-modal .d2h-code-side-emptyplaceholder {
+  background: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
+}
+
+.diff-viewer-modal table.d2h-diff-table {
+  width: 100%;
+  font-size: 12px;
+}
+
+/* Synchronized scroll container */
+.diff-viewer-modal .d2h-side-by-side {
+  display: flex;
+  height: 100%;
+}
+
 /* Transition utilities */
 .panel-transition {
   transition: all 200ms ease-in-out;

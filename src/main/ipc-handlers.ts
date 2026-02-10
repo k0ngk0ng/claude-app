@@ -181,6 +181,30 @@ export function registerIpcHandlers(): void {
     return terminalManager.kill(id);
   });
 
+  // ─── File ─────────────────────────────────────────────────────────
+  ipcMain.handle('file:read', (_event, filePath: string, maxSize?: number) => {
+    const limit = maxSize || 1024 * 512; // 512KB default
+    try {
+      const stat = fs.statSync(filePath);
+      if (stat.size > limit) {
+        return { error: 'File too large', size: stat.size };
+      }
+      // Check if file is likely binary
+      const fd = fs.openSync(filePath, 'r');
+      const buf = Buffer.alloc(Math.min(8192, stat.size));
+      fs.readSync(fd, buf, 0, buf.length, 0);
+      fs.closeSync(fd);
+      // Simple binary detection: check for null bytes in first 8KB
+      if (buf.includes(0)) {
+        return { error: 'Binary file', size: stat.size };
+      }
+      const content = fs.readFileSync(filePath, 'utf-8');
+      return { content, size: stat.size };
+    } catch (err: any) {
+      return { error: err.message || 'Failed to read file' };
+    }
+  });
+
   // ─── App ──────────────────────────────────────────────────────────
   ipcMain.handle('app:getProjectPath', () => {
     return os.homedir();

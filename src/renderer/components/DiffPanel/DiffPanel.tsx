@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useGit } from '../../hooks/useGit';
 import { useAppStore } from '../../stores/appStore';
 import { DiffView } from './DiffView';
+import { DiffViewerModal } from './DiffViewerModal';
 import type { FileChange } from '../../types';
 
 type TabType = 'unstaged' | 'staged';
@@ -13,6 +14,7 @@ export function DiffPanel() {
   const [diffContent, setDiffContent] = useState<string>('');
   const [commitMessage, setCommitMessage] = useState('');
   const [isCommitting, setIsCommitting] = useState(false);
+  const [diffModal, setDiffModal] = useState<{ filePath: string; diff: string } | null>(null);
 
   const files = activeTab === 'unstaged'
     ? gitStatus?.unstaged || []
@@ -109,6 +111,13 @@ export function DiffPanel() {
                   onClick={() => setSelectedFile(
                     selectedFile === file.path ? null : file.path
                   )}
+                  onDoubleClick={async () => {
+                    const staged = activeTab === 'staged';
+                    const diff = await getDiff(file.path, staged);
+                    if (diff) {
+                      setDiffModal({ filePath: file.path, diff });
+                    }
+                  }}
                   className={`flex items-center gap-2 w-full px-3 py-1.5 text-left
                              hover:bg-surface-hover transition-colors ${
                                selectedFile === file.path ? 'bg-surface' : ''
@@ -163,6 +172,15 @@ export function DiffPanel() {
             {isCommitting ? 'Committing…' : `Commit (${stagedCount} file${stagedCount !== 1 ? 's' : ''})`}
           </button>
         </div>
+      )}
+
+      {/* Diff viewer modal */}
+      {diffModal && (
+        <DiffViewerModal
+          filePath={diffModal.filePath}
+          diff={diffModal.diff}
+          onClose={() => setDiffModal(null)}
+        />
       )}
     </>
   );

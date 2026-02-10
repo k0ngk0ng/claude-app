@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { debugLog } from '../../stores/debugLogStore';
+import { FileViewer } from './FileViewer';
 
 interface TreeNode {
   name: string;
@@ -282,17 +283,25 @@ function TreeItem({
   depth,
   projectPath,
   onContextMenu,
+  onFileOpen,
 }: {
   node: TreeNode;
   depth: number;
   projectPath: string;
   onContextMenu: (e: React.MouseEvent, node: TreeNode) => void;
+  onFileOpen: (node: TreeNode) => void;
 }) {
   const [isOpen, setIsOpen] = useState(depth < 1);
 
   const handleClick = () => {
     if (node.isDir) {
       setIsOpen(!isOpen);
+    }
+  };
+
+  const handleDoubleClick = () => {
+    if (!node.isDir) {
+      onFileOpen(node);
     }
   };
 
@@ -306,6 +315,7 @@ function TreeItem({
     <>
       <button
         onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
         onContextMenu={handleContextMenu}
         className="flex items-center gap-1 w-full text-left hover:bg-surface-hover transition-colors py-[3px] pr-2"
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
@@ -336,6 +346,7 @@ function TreeItem({
           depth={depth + 1}
           projectPath={projectPath}
           onContextMenu={onContextMenu}
+          onFileOpen={onFileOpen}
         />
       ))}
     </>
@@ -350,6 +361,7 @@ export function FileTree() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; node: TreeNode } | null>(null);
+  const [viewerFile, setViewerFile] = useState<string | null>(null);
 
   const loadFiles = useCallback(async () => {
     if (!currentProject.path) return;
@@ -382,6 +394,10 @@ export function FileTree() {
 
   const handleCloseContextMenu = useCallback(() => {
     setContextMenu(null);
+  }, []);
+
+  const handleFileOpen = useCallback((node: TreeNode) => {
+    setViewerFile(node.path);
   }, []);
 
   return (
@@ -427,6 +443,7 @@ export function FileTree() {
                 depth={0}
                 projectPath={currentProject.path}
                 onContextMenu={handleContextMenu}
+                onFileOpen={handleFileOpen}
               />
             ))}
           </div>
@@ -447,6 +464,15 @@ export function FileTree() {
           node={contextMenu.node}
           projectPath={currentProject.path}
           onClose={handleCloseContextMenu}
+        />
+      )}
+
+      {/* File viewer modal */}
+      {viewerFile && (
+        <FileViewer
+          filePath={viewerFile}
+          projectPath={currentProject.path}
+          onClose={() => setViewerFile(null)}
         />
       )}
     </>

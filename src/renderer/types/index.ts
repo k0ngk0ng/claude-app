@@ -134,12 +134,23 @@ export interface CommandsAPI {
   remove: (filePath: string) => Promise<boolean>;
 }
 
+export interface FileReadResult {
+  content?: string;
+  error?: string;
+  size?: number;
+}
+
+export interface FileAPI {
+  read: (filePath: string, maxSize?: number) => Promise<FileReadResult>;
+}
+
 export interface WindowAPI {
   claude: ClaudeAPI;
   sessions: SessionsAPI;
   git: GitAPI;
   terminal: TerminalAPI;
   app: AppAPI;
+  file: FileAPI;
   claudeConfig: ClaudeConfigAPI;
   settings: SettingsFileAPI;
   skills: SkillsAPI;

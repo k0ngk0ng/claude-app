@@ -338,6 +338,11 @@ contextBridge.exposeInMainWorld('api', {
     },
   } satisfies AppAPI,
 
+  file: {
+    read: (filePath: string, maxSize?: number) =>
+      ipcRenderer.invoke('file:read', filePath, maxSize),
+  },
+
   claudeConfig: {
     read: () => ipcRenderer.invoke('claudeConfig:read'),
     write: (updates: Record<string, unknown>) => ipcRenderer.invoke('claudeConfig:write', updates),
