@@ -431,6 +431,9 @@ export function registerIpcHandlers(): void {
         case 'xcode':
           execFile('open', ['-a', 'Xcode', cwd]);
           return true;
+        case 'iterm':
+          execFile('open', ['-a', 'iTerm', cwd]);
+          return true;
         default:
           execFile(editor, [cwd], winShell);
           return true;
@@ -482,6 +485,21 @@ export function registerIpcHandlers(): void {
         editors.push({ id: editor.id, name: editor.name });
       } catch {
         // Editor not found, skip
+      }
+    }
+
+    // Mac-only: check for apps that don't have CLI commands
+    if (platform === 'mac') {
+      const macApps = [
+        { id: 'iterm', name: 'iTerm', path: '/Applications/iTerm.app' },
+      ];
+      for (const app of macApps) {
+        try {
+          await fs.promises.access(app.path);
+          editors.push({ id: app.id, name: app.name });
+        } catch {
+          // App not found, skip
+        }
       }
     }
 
