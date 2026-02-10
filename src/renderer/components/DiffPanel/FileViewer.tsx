@@ -8,25 +8,84 @@ interface FileViewerProps {
 }
 
 const EXT_LANG_MAP: Record<string, string> = {
+  // JavaScript / TypeScript
   ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript',
-  py: 'python', rb: 'ruby', rs: 'rust', go: 'go', java: 'java',
-  c: 'c', cpp: 'cpp', h: 'c', hpp: 'cpp', cs: 'csharp',
-  swift: 'swift', kt: 'kotlin', scala: 'scala', php: 'php',
-  sh: 'bash', bash: 'bash', zsh: 'bash', fish: 'bash',
-  html: 'xml', htm: 'xml', xml: 'xml', svg: 'xml',
-  css: 'css', scss: 'scss', less: 'less', sass: 'scss',
-  json: 'json', yaml: 'yaml', yml: 'yaml', toml: 'ini',
-  md: 'markdown', mdx: 'markdown',
-  sql: 'sql', graphql: 'graphql',
+  mjs: 'javascript', cjs: 'javascript', mts: 'typescript', cts: 'typescript',
+  // Web
+  html: 'xml', htm: 'xml', xml: 'xml', svg: 'xml', xsl: 'xml',
+  css: 'css', scss: 'scss', less: 'less', sass: 'scss', styl: 'stylus',
+  // Data / Config
+  json: 'json', yaml: 'yaml', yml: 'yaml', toml: 'ini', ini: 'ini',
+  env: 'bash', properties: 'properties',
+  // Markdown / Docs
+  md: 'markdown', mdx: 'markdown', txt: 'plaintext', rst: 'plaintext',
+  // Shell
+  sh: 'bash', bash: 'bash', zsh: 'bash', fish: 'bash', ps1: 'powershell',
+  bat: 'dos', cmd: 'dos',
+  // Python
+  py: 'python', pyw: 'python', pyi: 'python',
+  // Ruby
+  rb: 'ruby', erb: 'erb', rake: 'ruby', gemspec: 'ruby',
+  // Rust
+  rs: 'rust',
+  // Go
+  go: 'go', mod: 'go',
+  // Java / JVM
+  java: 'java', kt: 'kotlin', kts: 'kotlin', scala: 'scala', groovy: 'groovy',
+  gradle: 'groovy', clj: 'clojure', cljs: 'clojure',
+  // C / C++
+  c: 'c', h: 'c', cpp: 'cpp', cc: 'cpp', cxx: 'cpp', hpp: 'cpp', hxx: 'cpp',
+  // C# / .NET
+  cs: 'csharp', fs: 'fsharp', fsx: 'fsharp', vb: 'vbnet',
+  // Apple
+  swift: 'swift', m: 'objectivec', mm: 'objectivec',
+  // PHP
+  php: 'php',
+  // SQL
+  sql: 'sql',
+  // GraphQL
+  graphql: 'graphql', gql: 'graphql',
+  // Elixir / Erlang
+  ex: 'elixir', exs: 'elixir', erl: 'erlang', hrl: 'erlang',
+  // Haskell
+  hs: 'haskell', lhs: 'haskell',
+  // Lua
+  lua: 'lua',
+  // Perl
+  pl: 'perl', pm: 'perl',
+  // R
+  r: 'r',
+  // Dart / Flutter
+  dart: 'dart',
+  // Zig / Nim
+  zig: 'zig', nim: 'nim',
+  // OCaml / ReasonML
+  ml: 'ocaml', mli: 'ocaml', re: 'reasonml', rei: 'reasonml',
+  // Frameworks
+  vue: 'xml', svelte: 'xml', astro: 'xml',
+  // Build / DevOps
   dockerfile: 'dockerfile', makefile: 'makefile',
-  lua: 'lua', perl: 'perl', r: 'r', dart: 'dart',
-  vue: 'xml', svelte: 'xml',
+  tf: 'hcl', hcl: 'hcl',
+  nix: 'nix',
+  // Misc
+  proto: 'protobuf', thrift: 'thrift',
+  tex: 'latex', latex: 'latex',
+  diff: 'diff', patch: 'diff',
+  nginx: 'nginx', conf: 'nginx',
+  cmake: 'cmake',
+  asm: 'x86asm', s: 'x86asm',
+  wasm: 'wasm',
 };
 
 function getLanguage(filePath: string): string | undefined {
   const name = filePath.split('/').pop()?.toLowerCase() || '';
-  if (name === 'dockerfile') return 'dockerfile';
-  if (name === 'makefile') return 'makefile';
+  // Special filenames
+  if (name === 'dockerfile' || name.startsWith('dockerfile.')) return 'dockerfile';
+  if (name === 'makefile' || name === 'gnumakefile') return 'makefile';
+  if (name === 'cmakelists.txt') return 'cmake';
+  if (name === 'gemfile' || name === 'rakefile' || name === 'vagrantfile') return 'ruby';
+  if (name === '.gitignore' || name === '.dockerignore' || name === '.env') return 'bash';
+  if (name === 'nginx.conf') return 'nginx';
   const ext = name.split('.').pop() || '';
   return EXT_LANG_MAP[ext];
 }
@@ -78,14 +137,13 @@ export function FileViewer({ filePath, projectPath, onClose }: FileViewerProps) 
   const lines = content?.split('\n') || [];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex flex-col bg-bg" onClick={onClose}>
       <div
-        className="bg-bg border border-border rounded-lg shadow-2xl flex flex-col"
-        style={{ width: '85vw', height: '80vh', maxWidth: 1200 }}
+        className="flex flex-col w-full h-full"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-surface rounded-t-lg">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-surface shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="shrink-0 text-text-muted">
               <path d="M3 1.5h6.5L13 5v9.5a1 1 0 01-1 1H3a1 1 0 01-1-1v-13a1 1 0 011-1z"
@@ -138,7 +196,7 @@ export function FileViewer({ filePath, projectPath, onClose }: FileViewerProps) 
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-4 py-1.5 border-t border-border text-[11px] text-text-muted bg-surface rounded-b-lg">
+        <div className="flex items-center justify-between px-4 py-1.5 border-t border-border text-[11px] text-text-muted bg-surface shrink-0">
           <span>{lines.length} lines</span>
           <span>{getLanguage(filePath) || 'plain text'}</span>
         </div>

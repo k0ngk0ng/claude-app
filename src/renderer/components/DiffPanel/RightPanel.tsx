@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useResizable } from '../../hooks/useResizable';
 import { DiffPanel } from './DiffPanel';
@@ -7,8 +7,15 @@ import { FileTree } from './FileTree';
 type RightTab = 'changes' | 'files';
 
 export function RightPanel({ visible }: { visible?: boolean }) {
-  const { togglePanel, panelSizes, setPanelSize, gitStatus } = useAppStore();
+  const { togglePanel, panelSizes, setPanelSize, gitStatus, revealFile } = useAppStore();
   const [activeTab, setActiveTab] = useState<RightTab>('files');
+
+  // When revealFile is set, switch to Files tab
+  useEffect(() => {
+    if (revealFile) {
+      setActiveTab('files');
+    }
+  }, [revealFile]);
 
   const { handleMouseDown } = useResizable({
     direction: 'horizontal',

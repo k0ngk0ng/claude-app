@@ -46,6 +46,16 @@ function buildTree(files: string[]): TreeNode[] {
   return root;
 }
 
+/** Get all parent directory paths for a file path */
+function getParentPaths(filePath: string): string[] {
+  const parts = filePath.split('/');
+  const paths: string[] = [];
+  for (let i = 1; i < parts.length; i++) {
+    paths.push(parts.slice(0, i).join('/'));
+  }
+  return paths;
+}
+
 function FileIcon({ name, isDir, isOpen }: { name: string; isDir: boolean; isOpen?: boolean }) {
   if (isDir) {
     return isOpen ? (
@@ -90,10 +100,11 @@ interface ContextMenuProps {
   y: number;
   node: TreeNode;
   projectPath: string;
+  onViewFile: (node: TreeNode) => void;
   onClose: () => void;
 }
 
-function ContextMenu({ x, y, node, projectPath, onClose }: ContextMenuProps) {
+function ContextMenu({ x, y, node, projectPath, onViewFile, onClose }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -179,9 +190,24 @@ function ContextMenu({ x, y, node, projectPath, onClose }: ContextMenuProps) {
     onClose();
   };
 
+  const handleViewFile = () => {
+    onViewFile(node);
+    onClose();
+  };
+
   const menuItems: { label: string; icon: React.ReactNode; action: () => void; separator?: boolean }[] = [];
 
   if (!node.isDir) {
+    menuItems.push({
+      label: 'View File',
+      icon: (
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+          <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" strokeWidth="1.2" />
+          <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.2" />
+        </svg>
+      ),
+      action: handleViewFile,
+    });
     menuItems.push({
       label: 'Open with Default App',
       icon: (
@@ -282,16 +308,37 @@ function TreeItem({
   node,
   depth,
   projectPath,
+  expandedPaths,
+  highlightPath,
   onContextMenu,
   onFileOpen,
 }: {
   node: TreeNode;
   depth: number;
   projectPath: string;
+  expandedPaths: Set<string>;
+  highlightPath: string | null;
   onContextMenu: (e: React.MouseEvent, node: TreeNode) => void;
   onFileOpen: (node: TreeNode) => void;
 }) {
-  const [isOpen, setIsOpen] = useState(depth < 1);
+  const shouldForceOpen = node.isDir && expandedPaths.has(node.path);
+  const [isOpen, setIsOpen] = useState(depth < 1 || shouldForceOpen);
+  const isHighlighted = highlightPath === node.path;
+  const itemRef = useRef<HTMLButtonElement>(null);
+
+  // Force open when revealFile triggers
+  useEffect(() => {
+    if (shouldForceOpen) {
+      setIsOpen(true);
+    }
+  }, [shouldForceOpen]);
+
+  // Scroll into view when highlighted
+  useEffect(() => {
+    if (isHighlighted && itemRef.current) {
+      itemRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  }, [isHighlighted]);
 
   const handleClick = () => {
     if (node.isDir) {
@@ -314,10 +361,13 @@ function TreeItem({
   return (
     <>
       <button
+        ref={itemRef}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
         onContextMenu={handleContextMenu}
-        className="flex items-center gap-1 w-full text-left hover:bg-surface-hover transition-colors py-[3px] pr-2"
+        className={`flex items-center gap-1 w-full text-left hover:bg-surface-hover transition-colors py-[3px] pr-2 ${
+          isHighlighted ? 'bg-accent/15 ring-1 ring-accent/30' : ''
+        }`}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
       >
         {/* Expand/collapse chevron for directories */}
@@ -334,7 +384,7 @@ function TreeItem({
 
         <FileIcon name={node.name} isDir={node.isDir} isOpen={isOpen} />
 
-        <span className="text-xs text-text-secondary truncate font-mono">
+        <span className={`text-xs truncate font-mono ${isHighlighted ? 'text-text-primary font-medium' : 'text-text-secondary'}`}>
           {node.name}
         </span>
       </button>
@@ -345,6 +395,8 @@ function TreeItem({
           node={child}
           depth={depth + 1}
           projectPath={projectPath}
+          expandedPaths={expandedPaths}
+          highlightPath={highlightPath}
           onContextMenu={onContextMenu}
           onFileOpen={onFileOpen}
         />
@@ -356,12 +408,14 @@ function TreeItem({
 // ─── File Tree ───────────────────────────────────────────────────────
 
 export function FileTree() {
-  const { currentProject } = useAppStore();
+  const { currentProject, revealFile, setRevealFile } = useAppStore();
   const [files, setFiles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; node: TreeNode } | null>(null);
   const [viewerFile, setViewerFile] = useState<string | null>(null);
+  const [highlightPath, setHighlightPath] = useState<string | null>(null);
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
 
   const loadFiles = useCallback(async () => {
     if (!currentProject.path) return;
@@ -380,6 +434,31 @@ export function FileTree() {
     loadFiles();
   }, [loadFiles]);
 
+  // Handle revealFile from store
+  useEffect(() => {
+    if (!revealFile) return;
+
+    // Clear search so the file is visible in the tree
+    setSearchQuery('');
+
+    // Expand all parent directories
+    const parents = getParentPaths(revealFile);
+    setExpandedPaths(new Set(parents));
+
+    // Highlight the file
+    setHighlightPath(revealFile);
+
+    // Clear the store value
+    setRevealFile(null);
+
+    // Remove highlight after a delay
+    const timer = setTimeout(() => {
+      setHighlightPath(null);
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [revealFile, setRevealFile]);
+
   const filteredFiles = useMemo(() => {
     if (!searchQuery.trim()) return files;
     const q = searchQuery.toLowerCase();
@@ -397,6 +476,10 @@ export function FileTree() {
   }, []);
 
   const handleFileOpen = useCallback((node: TreeNode) => {
+    setViewerFile(node.path);
+  }, []);
+
+  const handleViewFile = useCallback((node: TreeNode) => {
     setViewerFile(node.path);
   }, []);
 
@@ -442,6 +525,8 @@ export function FileTree() {
                 node={node}
                 depth={0}
                 projectPath={currentProject.path}
+                expandedPaths={expandedPaths}
+                highlightPath={highlightPath}
                 onContextMenu={handleContextMenu}
                 onFileOpen={handleFileOpen}
               />
@@ -463,6 +548,7 @@ export function FileTree() {
           y={contextMenu.y}
           node={contextMenu.node}
           projectPath={currentProject.path}
+          onViewFile={handleViewFile}
           onClose={handleCloseContextMenu}
         />
       )}

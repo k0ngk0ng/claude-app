@@ -45,6 +45,7 @@ interface AppStore {
   isLoadingSession: boolean;
   gitStatus: GitStatus | null;
   platform: 'mac' | 'windows' | 'linux';
+  revealFile: string | null; // file path to reveal in FileTree
 
   // Session actions
   setCurrentSession: (session: Partial<CurrentSession>) => void;
@@ -92,6 +93,9 @@ interface AppStore {
 
   // Platform
   setPlatform: (platform: 'mac' | 'windows' | 'linux') => void;
+
+  // Reveal file in FileTree
+  setRevealFile: (filePath: string | null) => void;
 }
 
 const defaultSession: CurrentSession = {
@@ -128,6 +132,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   isLoadingSession: false,
   gitStatus: null,
   platform: 'mac',
+  revealFile: null,
 
   // Session actions
   setCurrentSession: (session) =>
@@ -326,4 +331,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   // Platform
   setPlatform: (platform) => set({ platform }),
+
+  // Reveal file
+  setRevealFile: (filePath) => set({ revealFile: filePath }),
 }));
