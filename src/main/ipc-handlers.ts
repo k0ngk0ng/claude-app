@@ -169,7 +169,7 @@ export function registerIpcHandlers(): void {
 
   // ─── App ──────────────────────────────────────────────────────────
   ipcMain.handle('app:getProjectPath', () => {
-    return process.cwd();
+    return os.homedir();
   });
 
   ipcMain.handle('app:selectDirectory', async () => {

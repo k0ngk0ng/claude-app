@@ -7,7 +7,7 @@ import { LogPanel } from '../Debug/LogPanel';
 
 type BottomTab = 'terminal' | 'logs';
 
-export function BottomPanel() {
+export function BottomPanel({ visible }: { visible?: boolean }) {
   const { panels, togglePanel, panelSizes, setPanelSize } = useAppStore();
   const debugMode = useSettingsStore(s => s.settings.general.debugMode);
 
@@ -44,7 +44,10 @@ export function BottomPanel() {
   return (
     <div
       className="relative shrink-0 border-t border-border bg-bg"
-      style={{ height: panelSizes.terminal }}
+      style={{
+        height: visible ? panelSizes.terminal : 0,
+        display: visible ? undefined : 'none',
+      }}
     >
       {/* Top-edge resize handle */}
       <div
@@ -111,18 +114,14 @@ export function BottomPanel() {
         </div>
       </div>
 
-      {/* Tab content */}
+      {/* Tab content — always mounted, hidden via CSS to preserve state */}
       <div style={{ height: 'calc(100% - 33px)' }}>
-        {activeTab === 'terminal' && (
-          <div className="h-full">
-            <TerminalPanel bare />
-          </div>
-        )}
-        {activeTab === 'logs' && (
-          <div className="h-full">
-            <LogPanel />
-          </div>
-        )}
+        <div className="h-full" style={{ display: activeTab === 'terminal' ? undefined : 'none' }}>
+          <TerminalPanel bare visible={visible && activeTab === 'terminal'} />
+        </div>
+        <div className="h-full" style={{ display: activeTab === 'logs' ? undefined : 'none' }}>
+          <LogPanel />
+        </div>
       </div>
     </div>
   );

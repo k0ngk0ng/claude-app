@@ -6,7 +6,7 @@ import { FileTree } from './FileTree';
 
 type RightTab = 'changes' | 'files';
 
-export function RightPanel() {
+export function RightPanel({ visible }: { visible?: boolean }) {
   const { togglePanel, panelSizes, setPanelSize, gitStatus } = useAppStore();
   const [activeTab, setActiveTab] = useState<RightTab>('files');
 
@@ -26,7 +26,10 @@ export function RightPanel() {
   return (
     <div
       className="relative border-l border-border bg-bg flex flex-col h-full shrink-0"
-      style={{ width: panelSizes.diff }}
+      style={{
+        width: visible ? panelSizes.diff : 0,
+        display: visible ? undefined : 'none',
+      }}
     >
       {/* Left-edge resize handle */}
       <div
@@ -91,10 +94,14 @@ export function RightPanel() {
         </button>
       </div>
 
-      {/* Tab content */}
+      {/* Tab content — always mounted, hidden via CSS to preserve state */}
       <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
-        {activeTab === 'changes' && <DiffPanel />}
-        {activeTab === 'files' && <FileTree />}
+        <div className="flex-1 overflow-hidden min-h-0 flex flex-col" style={{ display: activeTab === 'changes' ? undefined : 'none' }}>
+          <DiffPanel />
+        </div>
+        <div className="flex-1 overflow-hidden min-h-0 flex flex-col" style={{ display: activeTab === 'files' ? undefined : 'none' }}>
+          <FileTree />
+        </div>
       </div>
     </div>
   );

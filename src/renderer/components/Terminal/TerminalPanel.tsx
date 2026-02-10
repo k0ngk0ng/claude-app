@@ -6,7 +6,7 @@ import { useTerminal } from '../../hooks/useTerminal';
 import { useAppStore } from '../../stores/appStore';
 import { useResizable } from '../../hooks/useResizable';
 
-export function TerminalPanel({ bare }: { bare?: boolean } = {}) {
+export function TerminalPanel({ bare, visible }: { bare?: boolean; visible?: boolean } = {}) {
   const { currentProject, togglePanel, panelSizes, setPanelSize } = useAppStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
@@ -43,6 +43,21 @@ export function TerminalPanel({ bare }: { bare?: boolean } = {}) {
       }
     }
   }, [panelSizes.terminal]);
+
+  // Re-fit terminal when panel becomes visible again (CSS display toggle)
+  useEffect(() => {
+    if (visible && fitAddonRef.current) {
+      // Small delay to let the DOM layout settle after display:none → display:block
+      const timer = setTimeout(() => {
+        try {
+          fitAddonRef.current?.fit();
+        } catch {
+          // Ignore fit errors during transitions
+        }
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [visible]);
 
   const initTerminal = useCallback(async () => {
     if (!containerRef.current || initializedRef.current) return;

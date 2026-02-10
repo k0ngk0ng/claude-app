@@ -1,11 +1,12 @@
 import React from 'react';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { SettingsToggle } from './controls/SettingsToggle';
+import { SettingsSelect } from './controls/SettingsSelect';
 import { SettingsTagInput } from './controls/SettingsTagInput';
 
 export function PermissionsSection() {
-  const { settings, updatePermissions } = useSettingsStore();
-  const { permissions } = settings;
+  const { settings, updateGeneral, updatePermissions } = useSettingsStore();
+  const { general, permissions } = settings;
 
   return (
     <div>
@@ -15,6 +16,23 @@ export function PermissionsSection() {
       </p>
 
       <div className="space-y-6">
+        {/* Permission mode */}
+        <SettingsSelect
+          label="Permission mode"
+          description="Control how Claude handles tool permissions. This sets the default for new sessions."
+          value={general.autoApprove}
+          onChange={(v) => updateGeneral({ autoApprove: v as any })}
+          options={[
+            { value: 'acceptEdits', label: 'Accept edits — Auto-approve file edits' },
+            { value: 'bypassPermissions', label: 'Bypass permissions — Skip all prompts (⚠️ unsafe)' },
+            { value: 'plan', label: 'Plan mode — Analyze only, no modifications' },
+            { value: 'dontAsk', label: "Don't ask — Auto-deny unless pre-approved" },
+          ]}
+        />
+
+        {/* Divider */}
+        <div className="border-t border-border pt-2" />
+
         {/* File read */}
         <SettingsToggle
           label="Allow file reading"

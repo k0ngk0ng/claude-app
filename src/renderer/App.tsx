@@ -199,12 +199,12 @@ export default function App() {
               onStop={stopSession}
             />
 
-            {/* Bottom panel (Terminal + Debug Logs tabs) */}
-            {(panels.terminal || panels.logs) && <BottomPanel />}
+            {/* Bottom panel (Terminal + Debug Logs tabs) — always mounted, hidden via CSS */}
+            <BottomPanel visible={panels.terminal || panels.logs} />
           </div>
 
-          {/* Right panel (Changes + Files tabs) */}
-          {panels.diff && <RightPanel />}
+          {/* Right panel (Changes + Files tabs) — always mounted, hidden via CSS */}
+          <RightPanel visible={panels.diff} />
         </div>
       </div>
     </div>
