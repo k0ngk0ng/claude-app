@@ -375,8 +375,13 @@ loadSettingsFromFile().then((settings) => {
 
   // Once settings are loaded, emit an initial debug log so the panel isn't empty
   if (settings.general.debugMode) {
-    // Import lazily to avoid circular dependency
-    const { debugLog } = require('./debugLogStore');
-    debugLog('app', 'Debug mode enabled — settings loaded from file');
+    // Directly add to debug log store to bypass the debugMode check timing issue
+    const { useDebugLogStore } = require('./debugLogStore');
+    useDebugLogStore.getState().addLog({
+      category: 'app',
+      message: 'Debug mode enabled — settings loaded from file',
+      level: 'info',
+    });
+    console.log('[debug:app] Debug mode enabled — settings loaded from file');
   }
 });

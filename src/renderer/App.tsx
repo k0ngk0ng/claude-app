@@ -144,12 +144,13 @@ export default function App() {
   }, [togglePanel, openSettings, closeSettings, settingsOpen]);
 
   const handleNewThread = useCallback(async () => {
-    await stopSession();
+    // Save current session's runtime (don't kill the process — let it run in background)
+    useAppStore.getState().saveCurrentRuntime();
     useAppStore.getState().resetCurrentSession();
     useAppStore.getState().setCurrentSession({
       projectPath: currentProject.path,
     });
-  }, [stopSession, currentProject.path]);
+  }, [currentProject.path]);
 
   const handleSendMessage = useCallback(
     async (content: string, permissionMode?: string) => {
@@ -158,7 +159,9 @@ export default function App() {
 
       // Start a new process if we don't have one
       if (!state.currentSession.processId) {
-        await startSession(projectPath, state.currentSession.id || undefined, permissionMode);
+        // Only pass sessionId for resume if this is a session we want to continue
+        // Don't pass it for sessions loaded from disk history — start fresh
+        await startSession(projectPath, undefined, permissionMode);
       }
 
       await sendMessage(content);

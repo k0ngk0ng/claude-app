@@ -49,6 +49,9 @@ export const useDebugLogStore = create<DebugLogStore>((set) => ({
   setFilter: (filter) => set({ filter }),
 }));
 
+// Cached reference to avoid repeated require() calls
+let _settingsStoreRef: any = null;
+
 /**
  * Global debug logger — call from anywhere.
  * Only logs when debug mode is enabled in settings.
@@ -61,10 +64,13 @@ export function debugLog(
 ) {
   // Check if debug mode is enabled
   try {
-    const { useSettingsStore } = require('./settingsStore');
-    const debugMode = useSettingsStore.getState().settings.general.debugMode;
+    if (!_settingsStoreRef) {
+      _settingsStoreRef = require('./settingsStore').useSettingsStore;
+    }
+    const debugMode = _settingsStoreRef.getState().settings.general.debugMode;
     if (!debugMode) return;
   } catch {
+    // Settings store not ready yet — skip
     return;
   }
 
