@@ -252,6 +252,50 @@ export function useSessions() {
     [resetCurrentSession, setCurrentSession, saveCurrentRuntime]
   );
 
+  const forkSession = useCallback(
+    async (cutoffMessageId: string) => {
+      const state = useAppStore.getState();
+      const { id: sessionId, projectPath } = state.currentSession;
+      const effectivePath = projectPath || state.currentProject.path;
+
+      if (!sessionId) {
+        debugLog('session', 'fork: no session id — cannot fork unsaved session', undefined, 'warn');
+        return;
+      }
+
+      debugLog('session', `forking session ${sessionId} at message ${cutoffMessageId}`);
+
+      const newSessionId = await window.api.sessions.fork(effectivePath, sessionId, cutoffMessageId);
+      if (!newSessionId) {
+        debugLog('session', 'fork failed — backend returned null', undefined, 'error');
+        return;
+      }
+
+      debugLog('session', `forked → new session ${newSessionId}`);
+
+      // Save current runtime, then switch to the forked session
+      saveCurrentRuntime();
+
+      // Load the forked session's messages
+      const messages = await loadSessionMessages(effectivePath, newSessionId);
+
+      setCurrentSession({
+        id: newSessionId,
+        projectPath: effectivePath,
+        title: messages[0]?.content?.slice(0, 80) || 'Forked thread',
+        messages,
+        isStreaming: false,
+        processId: null,
+      });
+
+      // Reload sidebar
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('claude:session-updated'));
+      }, 300);
+    },
+    [saveCurrentRuntime, setCurrentSession, loadSessionMessages]
+  );
+
   const listProjects = useCallback(async () => {
     try {
       return await window.api.sessions.listProjects();
@@ -268,6 +312,7 @@ export function useSessions() {
     loadSessionMessages,
     selectSession,
     createNewSession,
+    forkSession,
     listProjects,
   };
 }

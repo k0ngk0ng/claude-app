@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { randomUUID } from 'crypto';
 import { getSessionsDir, encodePath } from './platform';
 
 const isWindows = process.platform === 'win32';
@@ -487,6 +488,91 @@ class SessionManager {
     } catch {
       return [];
     }
+  }
+
+  /**
+   * Fork a session: copy JSONL lines up to (and including) the message
+   * identified by `cutoffUuid` into a new session file.
+   * Returns the new session ID, or null on failure.
+   */
+  forkSession(projectPath: string, sessionId: string, cutoffUuid: string): string | null {
+    const encodedDir = this.findEncodedDir(projectPath);
+    if (!encodedDir) {
+      console.error(`[session] fork: could not find dir for ${projectPath}`);
+      return null;
+    }
+
+    const srcPath = path.join(this.sessionsDir, encodedDir, `${sessionId}.jsonl`);
+    if (!fs.existsSync(srcPath)) {
+      console.error(`[session] fork: source file not found: ${srcPath}`);
+      return null;
+    }
+
+    const content = fs.readFileSync(srcPath, 'utf-8');
+    const lines = content.split('\n').filter((l) => l.trim());
+
+    // Find the cutoff line index — the last JSONL line whose uuid matches,
+    // or whose assistant response follows the matching user message.
+    // Strategy: find the line with the matching uuid, then include all
+    // subsequent lines that belong to the same assistant turn (tool_result, etc.)
+    let cutoffIndex = -1;
+    for (let i = 0; i < lines.length; i++) {
+      try {
+        const parsed = JSON.parse(lines[i]);
+        if (parsed.uuid === cutoffUuid) {
+          cutoffIndex = i;
+          // If this is a user message, include the full assistant response that follows
+          if (parsed.message?.role === 'user') {
+            for (let j = i + 1; j < lines.length; j++) {
+              try {
+                const next = JSON.parse(lines[j]);
+                // Keep going while we're in the same assistant turn
+                if (next.message?.role === 'assistant' || next.type === 'progress' || next.type === 'file-history-snapshot') {
+                  cutoffIndex = j;
+                } else if (next.message?.role === 'user') {
+                  // Hit the next user message — stop before it
+                  break;
+                } else {
+                  cutoffIndex = j; // tool results, etc.
+                }
+              } catch { break; }
+            }
+          }
+          break;
+        }
+      } catch {
+        // skip malformed
+      }
+    }
+
+    if (cutoffIndex < 0) {
+      // Fallback: if uuid not found, try matching by message index
+      // (some messages may not have uuid)
+      console.warn(`[session] fork: cutoff uuid not found, copying all lines`);
+      cutoffIndex = lines.length - 1;
+    }
+
+    const forkedLines = lines.slice(0, cutoffIndex + 1);
+    const newSessionId = randomUUID();
+    const destPath = path.join(this.sessionsDir, encodedDir, `${newSessionId}.jsonl`);
+
+    // Rewrite session_id in each line to the new ID
+    const rewritten = forkedLines.map((line) => {
+      try {
+        const parsed = JSON.parse(line);
+        if (parsed.session_id) {
+          parsed.session_id = newSessionId;
+        }
+        return JSON.stringify(parsed);
+      } catch {
+        return line;
+      }
+    });
+
+    fs.writeFileSync(destPath, rewritten.join('\n') + '\n', 'utf-8');
+    console.log(`[session] forked ${forkedLines.length}/${lines.length} lines → ${newSessionId}`);
+
+    return newSessionId;
   }
 
   watchForChanges(callback: () => void): fs.FSWatcher | null {

@@ -22,6 +22,7 @@ export interface SessionsAPI {
   list: () => Promise<SessionInfo[]>;
   getMessages: (projectPath: string, sessionId: string) => Promise<RawMessage[]>;
   listProjects: () => Promise<ProjectInfo[]>;
+  fork: (projectPath: string, sessionId: string, cutoffUuid: string) => Promise<string | null>;
   onSessionsChanged: (callback: () => void) => void;
   removeSessionsChangedListener: (callback: () => void) => void;
 }

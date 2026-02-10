@@ -28,6 +28,7 @@ export interface SessionsAPI {
   list: () => Promise<unknown[]>;
   getMessages: (projectPath: string, sessionId: string) => Promise<unknown[]>;
   listProjects: () => Promise<unknown[]>;
+  fork: (projectPath: string, sessionId: string, cutoffUuid: string) => Promise<string | null>;
   onSessionsChanged: (callback: () => void) => void;
   removeSessionsChangedListener: (callback: () => void) => void;
 }
@@ -203,6 +204,8 @@ contextBridge.exposeInMainWorld('api', {
     getMessages: (projectPath: string, sessionId: string) =>
       ipcRenderer.invoke('sessions:getMessages', projectPath, sessionId),
     listProjects: () => ipcRenderer.invoke('sessions:listProjects'),
+    fork: (projectPath: string, sessionId: string, cutoffUuid: string) =>
+      ipcRenderer.invoke('sessions:fork', projectPath, sessionId, cutoffUuid),
     onSessionsChanged: (callback: () => void) => {
       const wrappedCallback = () => { callback(); };
       sessionsChangedListeners.set(callback, wrappedCallback);

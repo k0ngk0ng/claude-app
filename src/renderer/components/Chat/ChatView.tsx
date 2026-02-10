@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { usePermissionStore } from '../../stores/permissionStore';
+import { useSessions } from '../../hooks/useSessions';
 import { MessageBubble } from './MessageBubble';
 import { ToolCard } from './ToolCard';
 import { PermissionPrompt } from './PermissionPrompt';
@@ -11,11 +12,20 @@ export function ChatView() {
   const { currentSession, streamingContent, toolActivities, isLoadingSession } = useAppStore();
   const { settings } = useSettingsStore();
   const { pendingRequests } = usePermissionStore();
+  const { forkSession } = useSessions();
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const { messages, isStreaming } = currentSession;
   const hasMessages = messages.length > 0;
+
+  // Only allow fork when we have a saved session (not streaming, has session id)
+  const canFork = !!currentSession.id && !isStreaming;
+
+  const handleFork = useCallback((messageId: string) => {
+    if (!canFork) return;
+    forkSession(messageId);
+  }, [canFork, forkSession]);
 
   // Auto-scroll to bottom on new messages, streaming content, tool activities, or permission requests
   useEffect(() => {
@@ -42,7 +52,11 @@ export function ChatView() {
     >
       <div className={`${layoutClass} space-y-4`}>
         {messages.map((message) => (
-          <MessageBubble key={message.id} message={message} />
+          <MessageBubble
+            key={message.id}
+            message={message}
+            onFork={canFork ? handleFork : undefined}
+          />
         ))}
 
         {/* Streaming assistant message with tool activities inline */}

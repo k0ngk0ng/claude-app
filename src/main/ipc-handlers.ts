@@ -92,6 +92,13 @@ export function registerIpcHandlers(): void {
     return sessionManager.listAllProjects();
   });
 
+  ipcMain.handle(
+    'sessions:fork',
+    (_event, projectPath: string, sessionId: string, cutoffUuid: string) => {
+      return sessionManager.forkSession(projectPath, sessionId, cutoffUuid);
+    }
+  );
+
   // ─── Git ──────────────────────────────────────────────────────────
   ipcMain.handle('git:status', (_event, cwd: string) => {
     return gitManager.getStatus(cwd);
