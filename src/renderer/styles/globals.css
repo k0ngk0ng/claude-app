@@ -389,8 +389,16 @@ html.light .diff-line-del {
 }
 
 .diff-viewer-modal table.d2h-diff-table {
-  width: 100%;
   font-size: 12px;
+}
+
+/* No word wrap — horizontal scroll instead */
+.diff-viewer-modal .d2h-code-line,
+.diff-viewer-modal .d2h-code-side-line,
+.diff-viewer-modal .d2h-code-line-ctn {
+  white-space: pre !important;
+  word-wrap: normal !important;
+  overflow-wrap: normal !important;
 }
 
 /* Container: no scroll on outer, let side panels scroll */
