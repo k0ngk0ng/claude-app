@@ -395,6 +395,29 @@ html.light .diff-line-del {
   border-color: var(--color-border) !important;
 }
 
+/* Sticky line numbers — stay visible during horizontal scroll */
+.diff-viewer-modal .d2h-code-side-linenumber {
+  position: sticky !important;
+  left: 0 !important;
+  z-index: 1 !important;
+  background: var(--color-bg) !important;
+}
+
+.diff-viewer-modal .d2h-ins .d2h-code-side-linenumber {
+  background: rgba(46, 160, 67, 0.1) !important;
+}
+
+.diff-viewer-modal .d2h-del .d2h-code-side-linenumber {
+  background: rgba(248, 81, 73, 0.1) !important;
+}
+
+.diff-viewer-modal .d2h-info .d2h-code-side-linenumber,
+.diff-viewer-modal td.d2h-info {
+  position: sticky !important;
+  left: 0 !important;
+  z-index: 1 !important;
+}
+
 /* Transition utilities */
 .panel-transition {
   transition: all 200ms ease-in-out;
