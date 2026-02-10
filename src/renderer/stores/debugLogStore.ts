@@ -15,10 +15,12 @@ interface DebugLogStore {
   logs: LogEntry[];
   maxLogs: number;
   filter: LogCategory | 'all';
+  debugEnabled: boolean;
 
   addLog: (entry: Omit<LogEntry, 'id' | 'timestamp'>) => void;
   clearLogs: () => void;
   setFilter: (filter: LogCategory | 'all') => void;
+  setDebugEnabled: (enabled: boolean) => void;
 }
 
 let nextId = 1;
@@ -27,6 +29,7 @@ export const useDebugLogStore = create<DebugLogStore>((set) => ({
   logs: [],
   maxLogs: 2000,
   filter: 'all',
+  debugEnabled: false,
 
   addLog: (entry) => {
     set((state) => {
@@ -47,14 +50,14 @@ export const useDebugLogStore = create<DebugLogStore>((set) => ({
   clearLogs: () => set({ logs: [] }),
 
   setFilter: (filter) => set({ filter }),
-}));
 
-// Cached reference to avoid repeated require() calls
-let _settingsStoreRef: any = null;
+  setDebugEnabled: (enabled) => set({ debugEnabled: enabled }),
+}));
 
 /**
  * Global debug logger — call from anywhere.
- * Only logs when debug mode is enabled in settings.
+ * Only logs when debug mode is enabled.
+ * Debug mode is pushed from settingsStore via setDebugEnabled().
  */
 export function debugLog(
   category: LogCategory,
@@ -62,23 +65,14 @@ export function debugLog(
   detail?: unknown,
   level: 'info' | 'warn' | 'error' = 'info'
 ) {
-  // Check if debug mode is enabled
-  try {
-    if (!_settingsStoreRef) {
-      _settingsStoreRef = require('./settingsStore').useSettingsStore;
-    }
-    const debugMode = _settingsStoreRef.getState().settings.general.debugMode;
-    if (!debugMode) return;
-  } catch {
-    // Settings store not ready yet — skip
-    return;
-  }
+  const store = useDebugLogStore.getState();
+  if (!store.debugEnabled) return;
 
   const detailStr = detail !== undefined
     ? (typeof detail === 'string' ? detail : JSON.stringify(detail, null, 2))
     : undefined;
 
-  useDebugLogStore.getState().addLog({
+  store.addLog({
     category,
     message,
     detail: detailStr,
