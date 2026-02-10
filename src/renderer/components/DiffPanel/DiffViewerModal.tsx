@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { html as diff2htmlHtml } from 'diff2html';
+import { SearchBar } from './SearchBar';
 
 interface DiffViewerModalProps {
   filePath: string;
@@ -10,6 +11,7 @@ interface DiffViewerModalProps {
 export function DiffViewerModal({ filePath, diff, onClose }: DiffViewerModalProps) {
   const fileName = filePath.split('/').pop() || filePath;
   const containerRef = useRef<HTMLDivElement>(null);
+  const [showSearch, setShowSearch] = useState(false);
 
   const htmlContent = useMemo(() => {
     if (!diff) return '';
@@ -60,14 +62,18 @@ export function DiffViewerModal({ filePath, diff, onClose }: DiffViewerModalProp
     };
   }, [htmlContent]);
 
-  // Close on Escape
+  // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && !showSearch) onClose();
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault();
+        setShowSearch(true);
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
+  }, [onClose, showSearch]);
 
   return (
     <div className="fixed inset-0 top-12 z-50 flex flex-col bg-bg" onClick={onClose}>
@@ -96,6 +102,14 @@ export function DiffViewerModal({ filePath, diff, onClose }: DiffViewerModalProp
             </svg>
           </button>
         </div>
+
+        {/* Search bar */}
+        {showSearch && (
+          <SearchBar
+            containerRef={containerRef}
+            onClose={() => setShowSearch(false)}
+          />
+        )}
 
         {/* Diff content */}
         <div className="flex-1 overflow-hidden min-h-0 diff-viewer-modal">

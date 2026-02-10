@@ -423,6 +423,28 @@ html.light .diff-line-del {
   transition: all 200ms ease-in-out;
 }
 
+/* Search highlights */
+mark.search-highlight {
+  background-color: rgba(255, 200, 0, 0.3);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0;
+}
+
+mark.search-highlight.search-active {
+  background-color: rgba(255, 160, 0, 0.6);
+  outline: 1px solid rgba(255, 160, 0, 0.8);
+}
+
+html.light mark.search-highlight {
+  background-color: rgba(255, 200, 0, 0.4);
+}
+
+html.light mark.search-highlight.search-active {
+  background-color: rgba(255, 160, 0, 0.5);
+  outline: 1px solid rgba(255, 160, 0, 0.7);
+}
+
 /* ─── highlight.js theme (dark) ───────────────────────────────────── */
 .hljs {
   color: #c9d1d9;

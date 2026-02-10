@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import hljs from 'highlight.js';
+import { SearchBar } from './SearchBar';
 
 interface FileViewerProps {
   filePath: string;
@@ -94,6 +95,8 @@ export function FileViewer({ filePath, projectPath, onClose }: FileViewerProps) 
   const [content, setContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showSearch, setShowSearch] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const fullPath = filePath.startsWith('/') ? filePath : `${projectPath}/${filePath}`;
   const fileName = filePath.split('/').pop() || filePath;
@@ -125,14 +128,18 @@ export function FileViewer({ filePath, projectPath, onClose }: FileViewerProps) 
     }
   }, [content, filePath]);
 
-  // Close on Escape
+  // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && !showSearch) onClose();
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault();
+        setShowSearch(true);
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
+  }, [onClose, showSearch]);
 
   const lines = content?.split('\n') || [];
 
@@ -163,8 +170,16 @@ export function FileViewer({ filePath, projectPath, onClose }: FileViewerProps) 
           </button>
         </div>
 
+        {/* Search bar */}
+        {showSearch && (
+          <SearchBar
+            containerRef={contentRef}
+            onClose={() => setShowSearch(false)}
+          />
+        )}
+
         {/* Content */}
-        <div className="flex-1 overflow-auto min-h-0">
+        <div ref={contentRef} className="flex-1 overflow-auto min-h-0">
           {loading && (
             <div className="flex items-center justify-center h-full text-text-muted text-sm">
               Loading…
