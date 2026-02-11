@@ -79,7 +79,14 @@ const config: ForgeConfig = {
     icon: './assets/icon', // electron-packager auto-resolves .icns (macOS) / .ico (Windows)
     extraResource: ['./assets'],
     ...(canSignMac && {
-      osxSign: {},
+      osxSign: {
+        identity: 'Developer ID Application',
+        optionsForFile: () => ({
+          // Hardened runtime is required for notarization
+          entitlements: './entitlements.plist',
+          'entitlements-inherit': './entitlements.plist',
+        }),
+      },
       osxNotarize: {
         appleId,
         appleIdPassword,

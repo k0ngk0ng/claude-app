@@ -52,8 +52,15 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: \
             -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
-          # Add keychain to search list
-          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain
+          # Add keychain to search list (preserve existing keychains)
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+
+          # Verify certificate was imported
+          echo "=== Keychain search list ==="
+          security list-keychains -d user
+          echo "=== Signing identities ==="
+          security find-identity -v -p codesigning
+          echo "=== Certificate imported successfully ==="
 
       - name: Sync version from git tag
         run: npm run version:sync
