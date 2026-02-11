@@ -39,6 +39,18 @@ function copyDirSync(src: string, dest: string, skip?: Set<string>) {
   }
 }
 
+// macOS code signing + notarization (only when all 3 env vars are set)
+const appleId = process.env.APPLE_ID || '';
+const appleIdPassword = process.env.APPLE_ID_PASSWORD || '';
+const appleTeamId = process.env.APPLE_TEAM_ID || '';
+const canSignMac = !!(appleId && appleIdPassword && appleTeamId);
+
+if (canSignMac) {
+  console.log('  🔏 macOS code signing & notarization ENABLED');
+} else {
+  console.log('  ⚠ macOS code signing SKIPPED (missing APPLE_ID / APPLE_ID_PASSWORD / APPLE_TEAM_ID)');
+}
+
 const config: ForgeConfig = {
   packagerConfig: {
     name: 'Claude App',
@@ -54,6 +66,14 @@ const config: ForgeConfig = {
     },
     icon: './assets/icon', // electron-packager auto-resolves .icns (macOS) / .ico (Windows)
     extraResource: ['./assets'],
+    ...(canSignMac && {
+      osxSign: {},
+      osxNotarize: {
+        appleId,
+        appleIdPassword,
+        teamId: appleTeamId,
+      },
+    }),
   },
   hooks: {
     packageAfterCopy: async (_config, buildPath) => {
