@@ -8,9 +8,26 @@ export function WelcomeScreen() {
   const [missingDeps, setMissingDeps] = useState<DependencyStatus[]>([]);
 
   useEffect(() => {
-    window.api.app.checkDependencies().then((deps) => {
-      setMissingDeps(deps.filter((d) => !d.found));
-    }).catch(() => {});
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout>;
+
+    const check = (attempt: number) => {
+      window.api.app.checkDependencies().then((deps) => {
+        if (cancelled) return;
+        const missing = deps.filter((d) => !d.found);
+        setMissingDeps(missing);
+        // Retry up to 2 more times if deps are missing (PATH may not be ready yet)
+        if (missing.length > 0 && attempt < 3) {
+          retryTimer = setTimeout(() => check(attempt + 1), 2000);
+        }
+      }).catch(() => {});
+    };
+
+    check(1);
+    return () => {
+      cancelled = true;
+      clearTimeout(retryTimer);
+    };
   }, []);
 
   return (

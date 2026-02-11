@@ -10,15 +10,19 @@ export function getClaudeBinary(): string {
   const homeDir = os.homedir();
 
   if (isWindows) {
-    const localPath = path.join(homeDir, '.local', 'bin', 'claude.cmd');
-    try {
-      const stat = require('fs').statSync(localPath);
-      if (stat.isFile()) return localPath;
-    } catch {
-      // fall through
+    // Check common Windows install locations
+    const candidates = [
+      path.join(homeDir, '.local', 'bin', 'claude.cmd'),
+      path.join(homeDir, 'AppData', 'Roaming', 'npm', 'claude.cmd'),
+      path.join(homeDir, 'AppData', 'Local', 'npm-global', 'claude.cmd'),
+    ];
+    for (const p of candidates) {
+      try {
+        if (fs.statSync(p).isFile()) return p;
+      } catch { /* skip */ }
     }
     try {
-      return execSync('where claude', { encoding: 'utf-8' }).trim().split('\n')[0];
+      return execSync('where claude', { encoding: 'utf-8', timeout: 5000 }).trim().split('\n')[0];
     } catch {
       return 'claude';
     }

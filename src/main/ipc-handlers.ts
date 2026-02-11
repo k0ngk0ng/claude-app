@@ -16,7 +16,9 @@ const CDN_BASE_URL = process.env.CLAUDE_APP_CDN_URL || '';
 
 function getWebContents(): Electron.WebContents | null {
   const windows = BrowserWindow.getAllWindows();
-  return windows.length > 0 ? windows[0].webContents : null;
+  if (windows.length === 0) return null;
+  const wc = windows[0].webContents;
+  return wc.isDestroyed() ? null : wc;
 }
 
 export function registerIpcHandlers(): void {
@@ -436,11 +438,30 @@ export function registerIpcHandlers(): void {
     const https = require('https');
     const downloadDir = path.join(os.homedir(), 'Downloads');
     const filePath = path.join(downloadDir, fileName);
-    const wc = getWebContents();
 
     return new Promise<string>((resolve, reject) => {
+      let currentReq: any = null;
+      let fileStream: fs.WriteStream | null = null;
+      let aborted = false;
+
+      // Abort download if app is quitting
+      const onBeforeQuit = () => {
+        aborted = true;
+        if (currentReq) {
+          try { currentReq.destroy(); } catch {}
+        }
+        if (fileStream) {
+          try { fileStream.end(); } catch {}
+        }
+      };
+      app.once('before-quit', onBeforeQuit);
+
+      const cleanup = () => {
+        app.removeListener('before-quit', onBeforeQuit);
+      };
+
       const follow = (url: string) => {
-        https.get(url, {
+        currentReq = https.get(url, {
           headers: { 'User-Agent': 'claude-app' },
         }, (res: any) => {
           // Follow redirects
@@ -449,39 +470,55 @@ export function registerIpcHandlers(): void {
             return;
           }
           if (res.statusCode !== 200) {
+            cleanup();
             reject(new Error(`Download failed: HTTP ${res.statusCode}`));
             return;
           }
 
           const totalSize = parseInt(res.headers['content-length'] || '0', 10);
           let downloaded = 0;
-          const fileStream = fs.createWriteStream(filePath);
+          fileStream = fs.createWriteStream(filePath);
 
           res.on('data', (chunk: Buffer) => {
+            if (aborted) return;
             downloaded += chunk.length;
-            fileStream.write(chunk);
-            if (wc && totalSize > 0) {
-              const progress = Math.min(Math.round((downloaded / totalSize) * 100), 99);
-              wc.send('app:download-progress', { downloaded, totalSize, progress });
-            }
+            fileStream?.write(chunk);
+            try {
+              const wc = getWebContents();
+              if (wc && totalSize > 0) {
+                const progress = Math.min(Math.round((downloaded / totalSize) * 100), 99);
+                wc.send('app:download-progress', { downloaded, totalSize, progress });
+              }
+            } catch {}
           });
 
           res.on('end', () => {
-            fileStream.end(() => {
-              // Send 100% after file is fully written
-              if (wc && totalSize > 0) {
-                wc.send('app:download-progress', { downloaded: totalSize, totalSize, progress: 100 });
-              }
+            if (aborted) {
+              cleanup();
+              return;
+            }
+            fileStream?.end(() => {
+              try {
+                const wc = getWebContents();
+                if (wc && totalSize > 0) {
+                  wc.send('app:download-progress', { downloaded: totalSize, totalSize, progress: 100 });
+                }
+              } catch {}
+              cleanup();
               resolve(filePath);
             });
           });
 
           res.on('error', (err: Error) => {
-            fileStream.end();
+            fileStream?.end();
             try { fs.unlinkSync(filePath); } catch {}
+            cleanup();
             reject(err);
           });
-        }).on('error', reject);
+        }).on('error', (err: Error) => {
+          cleanup();
+          if (!aborted) reject(err);
+        });
       };
       follow(downloadUrl);
     });
