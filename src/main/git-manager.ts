@@ -109,6 +109,21 @@ class GitManager {
     if (file) args.push('--', file);
 
     const result = await this.exec(args, cwd);
+
+    // For untracked or newly added files, git diff returns empty.
+    // Use --no-index to generate a full-content diff.
+    if (!result.stdout.trim() && file) {
+      try {
+        const noIndexResult = await this.exec(
+          ['diff', '--no-index', '--no-color', '--', '/dev/null', file],
+          cwd
+        );
+        return noIndexResult.stdout;
+      } catch {
+        return result.stdout;
+      }
+    }
+
     return result.stdout;
   }
 

@@ -448,26 +448,29 @@ export function FileTree() {
   useEffect(() => {
     if (!revealFile) return;
 
-    // Clear search so the file is visible in the tree
-    setSearchQuery('');
+    // Reload files first (new files may not be in the list yet)
+    loadFiles().then(() => {
+      // Clear search so the file is visible in the tree
+      setSearchQuery('');
 
-    // Expand all parent directories
-    const parents = getParentPaths(revealFile);
-    setExpandedPaths(new Set(parents));
+      // Expand all parent directories
+      const parents = getParentPaths(revealFile);
+      setExpandedPaths(new Set(parents));
 
-    // Highlight the file
-    setHighlightPath(revealFile);
+      // Highlight the file
+      setHighlightPath(revealFile);
 
-    // Clear the store value
-    setRevealFile(null);
+      // Clear the store value
+      setRevealFile(null);
 
-    // Remove highlight after a delay
-    const timer = setTimeout(() => {
-      setHighlightPath(null);
-    }, 3000);
+      // Remove highlight after a delay
+      const timer = setTimeout(() => {
+        setHighlightPath(null);
+      }, 3000);
 
-    return () => clearTimeout(timer);
-  }, [revealFile, setRevealFile]);
+      return () => clearTimeout(timer);
+    });
+  }, [revealFile, setRevealFile, loadFiles]);
 
   const filteredFiles = useMemo(() => {
     if (!searchQuery.trim()) return files;
