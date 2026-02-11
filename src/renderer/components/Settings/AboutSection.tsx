@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { debugLog } from '../../stores/debugLogStore';
+import { useUpdateStore } from '../../stores/updateStore';
+import type { UpdateStatus } from '../../stores/updateStore';
 
 interface ReleaseInfo {
   version: string;
@@ -9,15 +11,6 @@ interface ReleaseInfo {
   htmlUrl: string;
   assets: { name: string; size: number; downloadUrl: string; cdnUrl?: string | null }[];
 }
-
-type UpdateStatus =
-  | { state: 'idle' }
-  | { state: 'checking' }
-  | { state: 'up-to-date' }
-  | { state: 'available'; release: ReleaseInfo }
-  | { state: 'downloading'; progress: number; downloaded: number; totalSize: number; source?: string }
-  | { state: 'downloaded'; filePath: string }
-  | { state: 'error'; message: string };
 
 type InstallStatus = 'idle' | 'installing' | 'success' | 'error';
 
@@ -167,8 +160,9 @@ export function AboutSection() {
   const [claudeCodeVersion, setClaudeCodeVersion] = useState('');
   const [gitVersion, setGitVersion] = useState('');
   const [platform, setPlatform] = useState('');
-  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({ state: 'idle' });
-  const [downloadFilePath, setDownloadFilePath] = useState('');
+
+  // Global update state — persists across page navigation
+  const { status: updateStatus, setStatus: setUpdateStatus, updateProgress } = useUpdateStore();
 
   // Install states
   const [claudeCodeInstall, setClaudeCodeInstall] = useState<{
@@ -190,26 +184,16 @@ export function AboutSection() {
     window.api.app.getPlatform().then(setPlatform).catch(() => {});
   }, []);
 
-  // Download progress listener
+  // Download progress listener — uses global store to survive navigation
   useEffect(() => {
     const handleProgress = (data: { downloaded: number; totalSize: number; progress: number }) => {
-      setUpdateStatus((prev) => {
-        // Only update if we're in downloading state — don't overwrite 'downloaded'
-        if (prev.state !== 'downloading') return prev;
-        return {
-          state: 'downloading',
-          progress: data.progress,
-          downloaded: data.downloaded,
-          totalSize: data.totalSize,
-          source: prev.source,
-        };
-      });
+      updateProgress(data);
     };
     window.api.app.onDownloadProgress(handleProgress);
     return () => {
       window.api.app.removeDownloadProgressListener(handleProgress);
     };
-  }, []);
+  }, [updateProgress]);
 
   const handleCheckForUpdates = useCallback(async () => {
     setUpdateStatus({ state: 'checking' });
@@ -260,7 +244,6 @@ export function AboutSection() {
       try {
         const filePath = await window.api.app.downloadUpdate(asset.cdnUrl, asset.name);
         debugLog('app', `CDN download complete: ${filePath}`);
-        setDownloadFilePath(filePath);
         setUpdateStatus({ state: 'downloaded', filePath });
         return;
       } catch (err: any) {
@@ -275,7 +258,6 @@ export function AboutSection() {
     try {
       const filePath = await window.api.app.downloadUpdate(asset.downloadUrl, asset.name);
       debugLog('app', `GitHub download complete: ${filePath}`);
-      setDownloadFilePath(filePath);
       setUpdateStatus({ state: 'downloaded', filePath });
     } catch (err: any) {
       debugLog('app', `Download failed: ${err?.message}`, err, 'error');
