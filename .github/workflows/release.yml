@@ -13,6 +13,8 @@ jobs:
     name: Release (macOS)
     runs-on: macos-latest
     environment: production
+    env:
+      CSC_LINK: ${{ secrets.CSC_LINK }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,9 +31,8 @@ jobs:
         run: npm ci
 
       - name: Import Apple Developer ID certificate
-        if: ${{ secrets.CSC_LINK != '' }}
+        if: env.CSC_LINK != ''
         env:
-          CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
         run: |
           # Decode the .p12 certificate
@@ -62,7 +63,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CLAUDE_STUDIO_CDN_URL: ${{ vars.ALIYUN_OSS_CDN_URL }}
-          CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
