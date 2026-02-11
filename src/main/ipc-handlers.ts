@@ -461,14 +461,19 @@ export function registerIpcHandlers(): void {
             downloaded += chunk.length;
             fileStream.write(chunk);
             if (wc && totalSize > 0) {
-              const progress = Math.round((downloaded / totalSize) * 100);
+              const progress = Math.min(Math.round((downloaded / totalSize) * 100), 99);
               wc.send('app:download-progress', { downloaded, totalSize, progress });
             }
           });
 
           res.on('end', () => {
-            fileStream.end();
-            resolve(filePath);
+            fileStream.end(() => {
+              // Send 100% after file is fully written
+              if (wc && totalSize > 0) {
+                wc.send('app:download-progress', { downloaded: totalSize, totalSize, progress: 100 });
+              }
+              resolve(filePath);
+            });
           });
 
           res.on('error', (err: Error) => {

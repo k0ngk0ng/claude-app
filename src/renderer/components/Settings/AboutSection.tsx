@@ -193,11 +193,15 @@ export function AboutSection() {
   // Download progress listener
   useEffect(() => {
     const handleProgress = (data: { downloaded: number; totalSize: number; progress: number }) => {
-      setUpdateStatus({
-        state: 'downloading',
-        progress: data.progress,
-        downloaded: data.downloaded,
-        totalSize: data.totalSize,
+      setUpdateStatus((prev) => {
+        // Only update if we're in downloading state — don't overwrite 'downloaded'
+        if (prev.state !== 'downloading') return prev;
+        return {
+          state: 'downloading',
+          progress: data.progress,
+          downloaded: data.downloaded,
+          totalSize: data.totalSize,
+        };
       });
     };
     window.api.app.onDownloadProgress(handleProgress);
