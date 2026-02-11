@@ -28,6 +28,31 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Import Apple Developer ID certificate
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: |
+          # Decode the .p12 certificate
+          CERTIFICATE_PATH=$RUNNER_TEMP/certificate.p12
+          echo "$CSC_LINK" | base64 --decode > "$CERTIFICATE_PATH"
+
+          # Create a temporary keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -hex 16)
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Import certificate into keychain
+          security import "$CERTIFICATE_PATH" -P "$CSC_KEY_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Add keychain to search list
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain
+
       - name: Sync version from git tag
         run: npm run version:sync
 
