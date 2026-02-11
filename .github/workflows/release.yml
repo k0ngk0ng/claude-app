@@ -233,7 +233,7 @@ jobs:
           echo "Endpoint: https://${{ secrets.ALIYUN_OSS_ENDPOINT }}"
           echo "Bucket: ${{ secrets.ALIYUN_OSS_BUCKET }}"
           # Verify access
-          ossutil ls oss://${{ secrets.ALIYUN_OSS_BUCKET }}/ --limited-num 1 || echo "Warning: cannot list bucket"
+          ossutil ls oss://${{ secrets.ALIYUN_OSS_BUCKET }}/claude-studio/ --limited-num 1 || echo "Warning: cannot list bucket"
 
       - name: Flatten artifacts for upload
         run: |
@@ -252,21 +252,21 @@ jobs:
           echo "Files to upload:"
           ls -lh upload/
 
-      - name: Upload to OSS — releases/${{ steps.version.outputs.TAG }}/
+      - name: Upload to OSS — claude-studio/releases/${{ steps.version.outputs.TAG }}/
         run: |
           ossutil cp -r upload/ \
-            oss://${{ secrets.ALIYUN_OSS_BUCKET }}/releases/${{ steps.version.outputs.TAG }}/ \
+            oss://${{ secrets.ALIYUN_OSS_BUCKET }}/claude-studio/releases/${{ steps.version.outputs.TAG }}/ \
             --force
 
-      - name: Upload to OSS — releases/latest/
+      - name: Upload to OSS — claude-studio/releases/latest/
         run: |
           ossutil cp -r upload/ \
-            oss://${{ secrets.ALIYUN_OSS_BUCKET }}/releases/latest/ \
+            oss://${{ secrets.ALIYUN_OSS_BUCKET }}/claude-studio/releases/latest/ \
             --force
 
       - name: Generate cdn-urls.json
         run: |
-          CDN_BASE="${{ vars.ALIYUN_OSS_CDN_URL }}/releases/${{ steps.version.outputs.TAG }}"
+          CDN_BASE="${{ vars.ALIYUN_OSS_CDN_URL }}/claude-studio/releases/${{ steps.version.outputs.TAG }}"
           TAG="${{ steps.version.outputs.TAG }}"
           echo '{}' > cdn-urls.json
           # Build JSON with all file URLs
@@ -286,16 +286,16 @@ jobs:
       - name: Upload cdn-urls.json to OSS
         run: |
           ossutil cp cdn-urls.json \
-            oss://${{ secrets.ALIYUN_OSS_BUCKET }}/releases/${{ steps.version.outputs.TAG }}/cdn-urls.json \
+            oss://${{ secrets.ALIYUN_OSS_BUCKET }}/claude-studio/releases/${{ steps.version.outputs.TAG }}/cdn-urls.json \
             --force
           ossutil cp cdn-urls.json \
-            oss://${{ secrets.ALIYUN_OSS_BUCKET }}/releases/latest/cdn-urls.json \
+            oss://${{ secrets.ALIYUN_OSS_BUCKET }}/claude-studio/releases/latest/cdn-urls.json \
             --force
 
       - name: Verify OSS upload
         run: |
-          echo "=== releases/${{ steps.version.outputs.TAG }}/ ==="
-          ossutil ls oss://${{ secrets.ALIYUN_OSS_BUCKET }}/releases/${{ steps.version.outputs.TAG }}/ --short
+          echo "=== claude-studio/releases/${{ steps.version.outputs.TAG }}/ ==="
+          ossutil ls oss://${{ secrets.ALIYUN_OSS_BUCKET }}/claude-studio/releases/${{ steps.version.outputs.TAG }}/ --short
           echo ""
-          echo "=== releases/latest/ ==="
-          ossutil ls oss://${{ secrets.ALIYUN_OSS_BUCKET }}/releases/latest/ --short
+          echo "=== claude-studio/releases/latest/ ==="
+          ossutil ls oss://${{ secrets.ALIYUN_OSS_BUCKET }}/claude-studio/releases/latest/ --short

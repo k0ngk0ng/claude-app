@@ -399,7 +399,7 @@ export function registerIpcHandlers(): void {
       if (CDN_BASE_URL) {
         try {
           const cdnData: string = await new Promise((resolve, reject) => {
-            const cdnJsonUrl = `${CDN_BASE_URL}/releases/${tagName}/cdn-urls.json`;
+            const cdnJsonUrl = `${CDN_BASE_URL}/claude-studio/releases/${tagName}/cdn-urls.json`;
             const mod = cdnJsonUrl.startsWith('https') ? https : require('http');
             mod.get(cdnJsonUrl, { timeout: 5000 }, (res: any) => {
               if (res.statusCode !== 200) { reject(new Error(`HTTP ${res.statusCode}`)); return; }
