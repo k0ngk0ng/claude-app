@@ -131,10 +131,23 @@ jobs:
       - name: Install NSIS
         run: choco install nsis -y
 
+      - name: Find packaged app directory
+        id: appdir
+        shell: bash
+        run: |
+          APP_DIR=$(find out -maxdepth 1 -type d -name "*-win32-*" | head -1)
+          if [ -z "$APP_DIR" ]; then
+            echo "ERROR: Could not find packaged app directory in out/"
+            ls -la out/
+            exit 1
+          fi
+          echo "APP_DIR=$APP_DIR" >> "$GITHUB_OUTPUT"
+          echo "Found app directory: $APP_DIR"
+
       - name: Build NSIS installer
         shell: cmd
         run: |
-          "C:\Program Files (x86)\NSIS\makensis.exe" /V4 /DPRODUCT_VERSION=${{ steps.version.outputs.VERSION }} "/DAPP_DIR=%CD%\out\ClaudeStudio-win32-x64" installer\installer.nsi
+          "C:\Program Files (x86)\NSIS\makensis.exe" /V4 /DPRODUCT_VERSION=${{ steps.version.outputs.VERSION }} "/DAPP_DIR=%CD%\${{ steps.appdir.outputs.APP_DIR }}" installer\installer.nsi
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
