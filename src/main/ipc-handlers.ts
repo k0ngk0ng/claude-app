@@ -150,8 +150,13 @@ export function registerIpcHandlers(): void {
     return fileManager.searchFiles(cwd, query);
   });
 
-  ipcMain.handle('git:listFiles', (_event, cwd: string) => {
-    return fileManager.listFiles(cwd);
+  ipcMain.handle('git:listFiles', async (_event, cwd: string) => {
+    try {
+      return await gitManager.listFiles(cwd);
+    } catch {
+      // Fallback for non-git directories
+      return fileManager.listFiles(cwd);
+    }
   });
 
   // ─── Terminal ─────────────────────────────────────────────────────

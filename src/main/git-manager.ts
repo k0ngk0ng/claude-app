@@ -135,6 +135,29 @@ class GitManager {
       .map((l) => l.trim());
   }
 
+  /**
+   * List all files respecting .gitignore rules.
+   * Combines tracked files + untracked (but not ignored) files.
+   */
+  async listFiles(cwd: string): Promise<string[]> {
+    // Tracked files (including staged new files)
+    const tracked = await this.exec(['ls-files', '--cached'], cwd);
+    // Untracked files that are not ignored
+    const untracked = await this.exec(['ls-files', '--others', '--exclude-standard'], cwd);
+
+    const fileSet = new Set<string>();
+    for (const line of tracked.stdout.split('\n')) {
+      const f = line.trim();
+      if (f) fileSet.add(f);
+    }
+    for (const line of untracked.stdout.split('\n')) {
+      const f = line.trim();
+      if (f) fileSet.add(f);
+    }
+
+    return Array.from(fileSet).sort();
+  }
+
   async stageFile(cwd: string, file: string): Promise<void> {
     await this.exec(['add', '--', file], cwd);
   }
