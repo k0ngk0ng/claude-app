@@ -129,7 +129,21 @@ jobs:
           CLAUDE_STUDIO_CDN_URL: ${{ vars.ALIYUN_OSS_CDN_URL }}
 
       - name: Install NSIS
-        run: choco install nsis -y
+        shell: pwsh
+        run: |
+          $maxRetries = 3
+          for ($i = 1; $i -le $maxRetries; $i++) {
+            Write-Host "Attempt $i of $maxRetries..."
+            choco install nsis -y
+            if ($LASTEXITCODE -eq 0) { break }
+            if ($i -lt $maxRetries) {
+              Write-Host "Failed, retrying in 30 seconds..."
+              Start-Sleep -Seconds 30
+            } else {
+              Write-Host "All attempts failed"
+              exit 1
+            }
+          }
 
       - name: Find packaged app directory
         id: appdir
