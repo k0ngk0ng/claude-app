@@ -311,8 +311,10 @@ export default function App() {
 
       // Start a new process if we don't have one
       if (!state.currentSession.processId) {
-        // Pass sessionId to resume if this session has one (e.g. forked thread)
-        const sessionId = state.currentSession.id || undefined;
+        // Pass sessionId to resume if this session has a real UUID (not a temp "new-*" id)
+        const rawId = state.currentSession.id || '';
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawId);
+        const sessionId = isUUID ? rawId : undefined;
         await startSession(projectPath, sessionId, permissionMode);
       }
 
