@@ -6,57 +6,22 @@ import path from 'path';
  * No dependency on git — works for any directory.
  */
 
-// Directories to always skip
+// Directories to always skip (only truly large/generated dirs)
 const IGNORED_DIRS = new Set([
   'node_modules',
   '.git',
   '.svn',
   '.hg',
-  'dist',
-  'build',
-  'out',
-  '.next',
-  '.nuxt',
-  '.output',
-  '__pycache__',
-  '.cache',
-  '.parcel-cache',
-  '.turbo',
-  '.vercel',
-  '.netlify',
-  'coverage',
-  '.nyc_output',
-  '.pytest_cache',
-  '.mypy_cache',
-  '.tox',
-  'venv',
-  '.venv',
-  'env',
-  '.env',
-  'vendor',
-  'Pods',
-  '.gradle',
-  '.idea',
-  '.vscode',
-  '.DS_Store',
-  'target',        // Rust/Java
-  'zig-cache',
-  'zig-out',
-  '.dart_tool',
-  '.pub-cache',
-  '.terraform',
 ]);
 
-// Binary / large file extensions to skip
+// Binary file extensions to skip (only truly binary/non-readable files)
 const IGNORED_EXTENSIONS = new Set([
   '.exe', '.dll', '.so', '.dylib', '.a', '.o', '.obj',
   '.zip', '.tar', '.gz', '.bz2', '.xz', '.7z', '.rar',
-  '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.webp', '.svg',
+  '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.webp',
   '.mp3', '.mp4', '.avi', '.mov', '.mkv', '.flac', '.wav',
-  '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
   '.woff', '.woff2', '.ttf', '.otf', '.eot',
   '.pyc', '.pyo', '.class',
-  '.lock',
 ]);
 
 const MAX_DEPTH = 10;
@@ -122,15 +87,8 @@ class FileManager {
 
       const name = entry.name;
 
-      // Skip hidden files/dirs (except a few common ones)
-      if (name.startsWith('.') && !name.startsWith('.env') && !name.startsWith('.git') && name !== '.github' && name !== '.vscode' && name !== '.editorconfig' && name !== '.eslintrc' && name !== '.prettierrc') {
-        // Allow .gitignore, .eslintrc.js, etc. (files, not dirs)
-        if (entry.isDirectory()) {
-          if (IGNORED_DIRS.has(name)) continue;
-          // Skip other hidden dirs
-          continue;
-        }
-      }
+      // Skip .DS_Store
+      if (name === '.DS_Store') continue;
 
       const fullPath = path.join(currentPath, name);
 
