@@ -69,7 +69,7 @@ const defaultSettings: AppSettings = {
     { id: 'new-line', label: 'New Line in Input', keys: 'Shift+Enter', action: 'newLine' },
   ],
   server: {
-    serverUrl: 'http://localhost:3456',
+    serverUrl: '',
   },
 };
 
