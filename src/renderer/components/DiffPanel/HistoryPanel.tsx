@@ -123,7 +123,7 @@ function FileContextMenu({ x, y, onViewDiff, onRevealInFiles, onCopyPath, onClos
 // ─── HistoryPanel ─────────────────────────────────────────────────────
 
 export function HistoryPanel() {
-  const { currentProject, setRevealFile } = useAppStore();
+  const { currentProject, setRevealFile, gitStatus } = useAppStore();
   const cwd = currentProject.path;
 
   const [commits, setCommits] = useState<GitCommit[]>([]);
@@ -135,21 +135,32 @@ export function HistoryPanel() {
   const [diffModal, setDiffModal] = useState<{ filePath: string; diff: string } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; hash: string; file: CommitFile } | null>(null);
 
-  // Load commits on mount / when cwd changes
-  useEffect(() => {
+  const loadCommits = useCallback(() => {
     if (!cwd) return;
-    let cancelled = false;
     setLoading(true);
     window.api.git.log(cwd, 200).then(result => {
-      if (!cancelled) {
-        setCommits(result);
-        setLoading(false);
-      }
+      setCommits(result);
+      setLoading(false);
     }).catch(() => {
-      if (!cancelled) setLoading(false);
+      setLoading(false);
     });
-    return () => { cancelled = true; };
   }, [cwd]);
+
+  // Load on mount / cwd change
+  useEffect(() => {
+    loadCommits();
+  }, [loadCommits]);
+
+  // Auto-refresh when gitStatus changes (e.g. after a commit in Changes tab)
+  const prevStagedRef = useRef(gitStatus?.staged.length ?? 0);
+  useEffect(() => {
+    const stagedCount = gitStatus?.staged.length ?? 0;
+    // When staged count drops to 0 from non-zero, a commit likely happened
+    if (prevStagedRef.current > 0 && stagedCount === 0) {
+      loadCommits();
+    }
+    prevStagedRef.current = stagedCount;
+  }, [gitStatus?.staged.length, loadCommits]);
 
   const toggleCommit = useCallback(async (hash: string) => {
     if (expandedHash === hash) {
@@ -238,6 +249,22 @@ export function HistoryPanel() {
 
   return (
     <>
+      {/* Toolbar */}
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border shrink-0">
+        <span className="text-[10px] text-text-muted">{commits.length} commits</span>
+        <button
+          onClick={loadCommits}
+          disabled={loading}
+          className="p-1 rounded hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors disabled:opacity-40"
+          title="Refresh"
+        >
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" className={loading ? 'animate-spin' : ''}>
+            <path d="M13.5 8a5.5 5.5 0 01-9.8 3.4M2.5 8a5.5 5.5 0 019.8-3.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+            <path d="M3.5 14.5v-3h3M12.5 1.5v3h-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      </div>
+
       <div className="flex-1 overflow-y-auto min-h-0">
         <div className="py-1">
           {commits.map((commit) => {
