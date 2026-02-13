@@ -147,6 +147,18 @@ export function registerIpcHandlers(): void {
     return gitManager.createAndCheckout(cwd, branch);
   });
 
+  ipcMain.handle('git:log', (_event, cwd: string, maxCount?: number) => {
+    return gitManager.log(cwd, maxCount);
+  });
+
+  ipcMain.handle('git:showCommitFiles', (_event, cwd: string, hash: string) => {
+    return gitManager.showCommitFiles(cwd, hash);
+  });
+
+  ipcMain.handle('git:showCommitFileDiff', (_event, cwd: string, hash: string, file: string) => {
+    return gitManager.showCommitFileDiff(cwd, hash, file);
+  });
+
   ipcMain.handle('git:searchFiles', (_event, cwd: string, query: string) => {
     return fileManager.searchFiles(cwd, query);
   });

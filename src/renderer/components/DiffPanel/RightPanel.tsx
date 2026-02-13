@@ -3,8 +3,9 @@ import { useAppStore } from '../../stores/appStore';
 import { useResizable } from '../../hooks/useResizable';
 import { DiffPanel } from './DiffPanel';
 import { FileTree } from './FileTree';
+import { HistoryPanel } from './HistoryPanel';
 
-type RightTab = 'changes' | 'files';
+type RightTab = 'changes' | 'files' | 'history';
 
 export function RightPanel({ visible }: { visible?: boolean }) {
   const { togglePanel, panelSizes, setPanelSize, gitStatus, revealFile } = useAppStore();
@@ -88,6 +89,22 @@ export function RightPanel({ visible }: { visible?: boolean }) {
               </span>
             )}
           </button>
+
+          {/* History tab */}
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors
+              border-b-2 ${activeTab === 'history'
+                ? 'border-accent text-text-primary'
+                : 'border-transparent text-text-muted hover:text-text-secondary'
+              }`}
+          >
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.2" />
+              <path d="M8 5v3.5l2.5 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            History
+          </button>
         </div>
 
         {/* Close button */}
@@ -108,6 +125,9 @@ export function RightPanel({ visible }: { visible?: boolean }) {
         </div>
         <div className="flex-1 overflow-hidden min-h-0 flex flex-col" style={{ display: activeTab === 'files' ? undefined : 'none' }}>
           <FileTree />
+        </div>
+        <div className="flex-1 overflow-hidden min-h-0 flex flex-col" style={{ display: activeTab === 'history' ? undefined : 'none' }}>
+          <HistoryPanel />
         </div>
       </div>
     </div>

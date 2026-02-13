@@ -253,6 +253,51 @@ class GitManager {
     return result.stderr || result.stdout;
   }
 
+  async log(cwd: string, maxCount = 100): Promise<{ hash: string; shortHash: string; subject: string; author: string; date: string }[]> {
+    const sep = '@@SEP@@';
+    const result = await this.exec(
+      ['log', `--max-count=${maxCount}`, `--pretty=format:%H${sep}%h${sep}%s${sep}%an${sep}%aI`],
+      cwd
+    );
+    if (!result.stdout.trim()) return [];
+    return result.stdout.trim().split('\n').map(line => {
+      const [hash, shortHash, subject, author, date] = line.split(sep);
+      return { hash, shortHash, subject, author, date };
+    });
+  }
+
+  async showCommitFiles(cwd: string, hash: string): Promise<{ path: string; status: string }[]> {
+    const result = await this.exec(
+      ['diff-tree', '--no-commit-id', '-r', '--name-status', hash],
+      cwd
+    );
+    if (!result.stdout.trim()) return [];
+    return result.stdout.trim().split('\n').map(line => {
+      const [status, ...rest] = line.split('\t');
+      return { path: rest.join('\t'), status: status.charAt(0) };
+    });
+  }
+
+  async showCommitFileDiff(cwd: string, hash: string, file: string): Promise<string> {
+    const result = await this.exec(
+      ['diff', `${hash}~1`, hash, '--no-color', '--', file],
+      cwd
+    );
+    // For the first commit (no parent), fall back to show
+    if (!result.stdout.trim()) {
+      try {
+        const showResult = await this.exec(
+          ['show', '--no-color', '--format=', hash, '--', file],
+          cwd
+        );
+        return showResult.stdout;
+      } catch {
+        return result.stdout;
+      }
+    }
+    return result.stdout;
+  }
+
   async isGitRepo(cwd: string): Promise<boolean> {
     try {
       await this.exec(['rev-parse', '--is-inside-work-tree'], cwd);

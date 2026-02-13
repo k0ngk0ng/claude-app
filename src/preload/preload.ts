@@ -47,6 +47,9 @@ export interface GitAPI {
   listFiles: (cwd: string) => Promise<string[]>;
   push: (cwd: string) => Promise<string>;
   pushTags: (cwd: string) => Promise<string>;
+  log: (cwd: string, maxCount?: number) => Promise<{ hash: string; shortHash: string; subject: string; author: string; date: string }[]>;
+  showCommitFiles: (cwd: string, hash: string) => Promise<{ path: string; status: string }[]>;
+  showCommitFileDiff: (cwd: string, hash: string, file: string) => Promise<string>;
 }
 
 export interface TerminalAPI {
@@ -256,6 +259,9 @@ contextBridge.exposeInMainWorld('api', {
     listFiles: (cwd: string) => ipcRenderer.invoke('git:listFiles', cwd),
     push: (cwd: string) => ipcRenderer.invoke('git:push', cwd),
     pushTags: (cwd: string) => ipcRenderer.invoke('git:pushTags', cwd),
+    log: (cwd: string, maxCount?: number) => ipcRenderer.invoke('git:log', cwd, maxCount),
+    showCommitFiles: (cwd: string, hash: string) => ipcRenderer.invoke('git:showCommitFiles', cwd, hash),
+    showCommitFileDiff: (cwd: string, hash: string, file: string) => ipcRenderer.invoke('git:showCommitFileDiff', cwd, hash, file),
   } satisfies GitAPI,
 
   terminal: {

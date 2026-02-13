@@ -41,6 +41,9 @@ export interface GitAPI {
   listFiles: (cwd: string) => Promise<string[]>;
   push: (cwd: string) => Promise<string>;
   pushTags: (cwd: string) => Promise<string>;
+  log: (cwd: string, maxCount?: number) => Promise<GitCommit[]>;
+  showCommitFiles: (cwd: string, hash: string) => Promise<{ path: string; status: string }[]>;
+  showCommitFileDiff: (cwd: string, hash: string, file: string) => Promise<string>;
 }
 
 export interface TerminalAPI {
@@ -276,6 +279,14 @@ export interface GitStatus {
   branch: string;
   unstaged: FileChange[];
   staged: FileChange[];
+}
+
+export interface GitCommit {
+  hash: string;
+  shortHash: string;
+  subject: string;
+  author: string;
+  date: string;
 }
 
 // ─── Claude stream event types ──────────────────────────────────────
