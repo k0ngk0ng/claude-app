@@ -128,19 +128,19 @@ class SessionManager {
   }
 
   /**
-   * Clean up IDE-generated tags from prompts:
-   * - <ide_opened_file>...</ide_opened_file>
-   * - <ide_selection>...</ide_selection>
-   * - <ide_viewport>...</ide_viewport>
+   * Clean up special tags from prompts:
+   * - <ide_opened_file>...</ide_opened_file> and other IDE tags
+   * - <local-command-caveat>...</local-command-caveat> and other SDK command tags
+   * - Any remaining XML-like tags (e.g. <command-name>, <command-message>, <command-args>)
    * Also handles unclosed/truncated tags.
-   * Returns empty string if the entire content is IDE tags.
+   * Returns empty string if the entire content is tags with no meaningful text.
    */
   private cleanPrompt(prompt: string): string {
     if (!prompt) return '';
-    // Strip complete IDE tags (closed)
-    let cleaned = prompt.replace(/<ide_[a-z_]+>[\s\S]*?<\/ide_[a-z_]+>/g, '').trim();
-    // Strip unclosed/truncated IDE tags
-    cleaned = cleaned.replace(/<ide_[a-z_]+>[\s\S]*/g, '').trim();
+    // Strip complete XML-like tags (closed) — covers ide_*, local-command-caveat, command-*, etc.
+    let cleaned = prompt.replace(/<[a-z_-]+>[\s\S]*?<\/[a-z_-]+>/g, '').trim();
+    // Strip unclosed/truncated tags
+    cleaned = cleaned.replace(/<[a-z_-]+>[\s\S]*/g, '').trim();
     return cleaned;
   }
 
@@ -280,13 +280,19 @@ class SessionManager {
                   const textBlock = content.find((b: any) => b.type === 'text' && b.text);
                   if (textBlock) text = textBlock.text.slice(0, 200);
                 }
-                // Skip IDE-only prompts, try to find a real user message
-                if (text && !text.startsWith('<ide_opened_file>')) {
+                // Skip tag-only prompts (IDE tags, SDK command tags, etc.)
+                if (text && !text.startsWith('<')) {
                   firstPrompt = text;
                   break;
-                } else if (!firstPrompt) {
-                  // Keep as fallback if no better prompt found
-                  firstPrompt = text;
+                } else if (text) {
+                  // Clean tags and check if there's real text underneath
+                  const cleaned = this.cleanPrompt(text);
+                  if (cleaned) {
+                    firstPrompt = cleaned;
+                    break;
+                  }
+                  // Keep raw as fallback if no better prompt found
+                  if (!firstPrompt) firstPrompt = text;
                 }
               }
             } catch {
@@ -321,8 +327,8 @@ class SessionManager {
 
   /**
    * Read the first meaningful user prompt from a JSONL file (first 16KB).
-   * Strips <ide_opened_file> tags from text blocks.
-   * If a message is entirely IDE tags, continues to the next user message.
+   * Strips XML tags (IDE tags, SDK command tags, etc.) from text blocks.
+   * If a message is entirely tags, continues to the next user message.
    */
   private readFirstPromptFromJsonl(jsonlPath: string): string {
     try {
