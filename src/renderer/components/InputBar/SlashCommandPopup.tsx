@@ -8,11 +8,10 @@ export interface SlashItem {
   argumentHint: string;
   source: 'builtin' | 'custom';
   type?: 'md' | 'sh';
-  local?: boolean; // handled locally in GUI, not sent to SDK
 }
 
-/** Commands handled entirely in the GUI */
-export const LOCAL_COMMANDS = new Set(['clear', 'config', 'help', 'bug', 'doctor', 'init', 'login', 'logout', 'terminal-setup', 'vim']);
+/** Commands handled entirely in the GUI (not sent to SDK) */
+export const LOCAL_COMMANDS = new Set(['config', 'help', 'bug', 'doctor', 'init', 'login', 'logout', 'terminal-setup', 'vim']);
 
 /**
  * Commands that require an interactive terminal and can't work through the SDK.
@@ -25,28 +24,28 @@ export const TERMINAL_ONLY_COMMANDS = new Set(['bug', 'doctor', 'init', 'login',
  * If no process is running, they'll be intercepted with a helpful message
  * instead of spawning a throwaway session.
  */
-export const SDK_SESSION_COMMANDS = new Set(['compact', 'context', 'cost', 'model', 'status', 'permissions', 'memory', 'add-dir', 'review']);
+export const SDK_SESSION_COMMANDS = new Set(['clear', 'compact', 'context', 'cost', 'model', 'status', 'permissions', 'memory', 'add-dir', 'review']);
 
 export const BUILTIN_COMMANDS: SlashItem[] = [
   { name: 'add-dir', description: 'Add additional directories to the current session context', argumentHint: '<directory>', source: 'builtin' },
-  { name: 'bug', description: 'Report bugs — requires terminal (claude /bug)', argumentHint: '[description]', source: 'builtin', local: true },
-  { name: 'clear', description: 'Clear conversation history and free up context', argumentHint: '', source: 'builtin', local: true },
+  { name: 'bug', description: 'Report bugs — requires terminal (claude /bug)', argumentHint: '[description]', source: 'builtin' },
+  { name: 'clear', description: 'Clear conversation history and free up context', argumentHint: '', source: 'builtin' },
   { name: 'compact', description: 'Compact conversation to save context space', argumentHint: '[instructions]', source: 'builtin' },
-  { name: 'config', description: 'Open settings', argumentHint: '', source: 'builtin', local: true },
+  { name: 'config', description: 'Open settings', argumentHint: '', source: 'builtin' },
   { name: 'context', description: 'Manage context files and directories for the session', argumentHint: '', source: 'builtin' },
   { name: 'cost', description: 'Show token usage and cost for this session', argumentHint: '', source: 'builtin' },
-  { name: 'doctor', description: 'Check installation health — requires terminal (claude /doctor)', argumentHint: '', source: 'builtin', local: true },
-  { name: 'help', description: 'Show available commands and usage information', argumentHint: '', source: 'builtin', local: true },
-  { name: 'init', description: 'Initialize CLAUDE.md — requires terminal (claude /init)', argumentHint: '', source: 'builtin', local: true },
-  { name: 'login', description: 'Switch accounts — requires terminal (claude /login)', argumentHint: '', source: 'builtin', local: true },
-  { name: 'logout', description: 'Sign out — requires terminal (claude /logout)', argumentHint: '', source: 'builtin', local: true },
+  { name: 'doctor', description: 'Check installation health — requires terminal (claude /doctor)', argumentHint: '', source: 'builtin' },
+  { name: 'help', description: 'Show available commands and usage information', argumentHint: '', source: 'builtin' },
+  { name: 'init', description: 'Initialize CLAUDE.md — requires terminal (claude /init)', argumentHint: '', source: 'builtin' },
+  { name: 'login', description: 'Switch accounts — requires terminal (claude /login)', argumentHint: '', source: 'builtin' },
+  { name: 'logout', description: 'Sign out — requires terminal (claude /logout)', argumentHint: '', source: 'builtin' },
   { name: 'memory', description: 'Edit CLAUDE.md memory files', argumentHint: '', source: 'builtin' },
   { name: 'model', description: 'Switch or display the current AI model', argumentHint: '[model-name]', source: 'builtin' },
   { name: 'permissions', description: 'View or update tool permissions', argumentHint: '', source: 'builtin' },
   { name: 'review', description: 'Review a pull request or set of changes', argumentHint: '[pr-url]', source: 'builtin' },
   { name: 'status', description: 'Show current session status and configuration', argumentHint: '', source: 'builtin' },
-  { name: 'terminal-setup', description: 'Install key bindings — requires terminal', argumentHint: '', source: 'builtin', local: true },
-  { name: 'vim', description: 'Vim mode — requires terminal (claude /vim)', argumentHint: '', source: 'builtin', local: true },
+  { name: 'terminal-setup', description: 'Install key bindings — requires terminal', argumentHint: '', source: 'builtin' },
+  { name: 'vim', description: 'Vim mode — requires terminal (claude /vim)', argumentHint: '', source: 'builtin' },
 ];
 
 // ─── Component ──────────────────────────────────────────────────────
@@ -182,15 +181,13 @@ export function SlashCommandPopup({
           >
             {/* Source badge */}
             <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono shrink-0 ${
-              cmd.local
-                ? 'bg-success/10 text-success'
-                : cmd.source === 'builtin'
-                  ? 'bg-info/10 text-info'
-                  : cmd.type === 'sh'
-                    ? 'bg-warning/10 text-warning'
-                    : 'bg-accent/10 text-accent'
+              cmd.source === 'builtin'
+                ? 'bg-info/10 text-info'
+                : cmd.type === 'sh'
+                  ? 'bg-warning/10 text-warning'
+                  : 'bg-accent/10 text-accent'
             }`}>
-              {cmd.local ? 'local' : cmd.source === 'builtin' ? 'built-in' : `.${cmd.type}`}
+              {cmd.source === 'builtin' ? 'built-in' : `.${cmd.type}`}
             </span>
 
             {/* Name + description */}

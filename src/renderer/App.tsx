@@ -240,7 +240,7 @@ export default function App() {
 
       if (!LOCAL_COMMANDS.has(cmd)) return false;
 
-      const { addMessage, clearMessages } = useAppStore.getState();
+      const { addMessage } = useAppStore.getState();
 
       // Terminal-only commands — show hint instead of sending to SDK
       if (TERMINAL_ONLY_COMMANDS.has(cmd)) {
@@ -254,16 +254,6 @@ export default function App() {
       }
 
       switch (cmd) {
-        case 'clear': {
-          clearMessages();
-          // Also send to SDK if process is running so it clears context
-          const pid = useAppStore.getState().currentSession.processId;
-          if (pid) {
-            window.api.claude.send(pid, '/clear').catch(() => {});
-          }
-          return true;
-        }
-
         case 'config': {
           openSettings();
           return true;
@@ -274,12 +264,10 @@ export default function App() {
           const lines = ['**Available slash commands:**\n'];
           for (const c of BUILTIN_COMMANDS) {
             const hint = c.argumentHint ? ` \`${c.argumentHint}\`` : '';
-            const tag = c.local ? ' *(local)*' : '';
-            lines.push(`- \`/${c.name}\`${hint} — ${c.description}${tag}`);
+            lines.push(`- \`/${c.name}\`${hint} — ${c.description}`);
           }
           lines.push('');
           lines.push('Custom commands from `~/.claude/commands/` are also available.');
-          lines.push('Commands marked *(local)* are handled in the GUI without using tokens.');
 
           addMessage({
             id: `local-help-${Date.now()}`,
