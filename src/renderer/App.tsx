@@ -259,15 +259,16 @@ export default function App() {
         }
 
         case 'help': {
-          // Build help text from all commands
-          const lines = ['Available slash commands:\n'];
+          // Build help text as markdown
+          const lines = ['**Available slash commands:**\n'];
           for (const c of BUILTIN_COMMANDS) {
-            const hint = c.argumentHint ? ` ${c.argumentHint}` : '';
-            const tag = c.local ? ' (local)' : '';
-            lines.push(`  /${c.name}${hint} — ${c.description}${tag}`);
+            const hint = c.argumentHint ? ` \`${c.argumentHint}\`` : '';
+            const tag = c.local ? ' *(local)*' : '';
+            lines.push(`- \`/${c.name}\`${hint} — ${c.description}${tag}`);
           }
-          lines.push('\nCustom commands from ~/.claude/commands/ are also available.');
-          lines.push('Commands marked (local) are handled in the GUI without using tokens.');
+          lines.push('');
+          lines.push('Custom commands from `~/.claude/commands/` are also available.');
+          lines.push('Commands marked *(local)* are handled in the GUI without using tokens.');
 
           addMessage({
             id: `local-help-${Date.now()}`,
