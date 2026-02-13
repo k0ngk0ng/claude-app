@@ -7,6 +7,15 @@ set -euo pipefail
 CONF_DIR="${CONF_DIR:-/etc/claude-studio}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# Ensure node/npm are in PATH (sudo may reset PATH)
+for p in /usr/local/bin /usr/local/nodejs/bin "$HOME/.nvm/versions/node"/*/bin; do
+  [ -d "$p" ] && export PATH="$p:$PATH"
+done
+if ! command -v npm &>/dev/null; then
+  echo "Error: npm not found. Make sure Node.js is installed and in PATH."
+  exit 1
+fi
+
 # Load existing config
 if [ ! -f "$CONF_DIR/server.env" ]; then
   echo "Error: $CONF_DIR/server.env not found. Run deploy.sh first."
