@@ -201,8 +201,18 @@ export function useClaude() {
     const handler = (processId: string, raw: unknown) => {
       const event = raw as StreamEvent;
 
+      // Check both processIdRef (fast path) and store (handles restoreRuntime
+      // where useEffect hasn't synced processIdRef yet)
+      const storeProcessId = useAppStore.getState().currentSession.processId;
+      const isCurrentSession = processId === processIdRef.current || processId === storeProcessId;
+
+      // Eagerly sync processIdRef if store has a value we don't
+      if (storeProcessId && processIdRef.current !== storeProcessId) {
+        processIdRef.current = storeProcessId;
+      }
+
       // If this message is NOT for the current session, route to background runtime
-      if (processId !== processIdRef.current) {
+      if (!isCurrentSession) {
         handleBackgroundEvent(processId, event);
         return;
       }
@@ -584,7 +594,7 @@ export function useClaude() {
           lastResultIdRef.current = resultId;
 
           // Guard: if user already switched away, route to background
-          if (processId !== processIdRef.current) {
+          if (!isCurrentSession) {
             handleBackgroundEvent(processId, event);
             break;
           }
@@ -726,7 +736,7 @@ export function useClaude() {
 
         case 'error': {
           // Guard: if user already switched away, route to background
-          if (processId !== processIdRef.current) {
+          if (!isCurrentSession) {
             handleBackgroundEvent(processId, event);
             break;
           }
@@ -762,7 +772,7 @@ export function useClaude() {
 
         case 'exit': {
           // Guard: if user already switched away, route to background
-          if (processId !== processIdRef.current) {
+          if (!isCurrentSession) {
             handleBackgroundEvent(processId, event);
             break;
           }
