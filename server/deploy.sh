@@ -3,14 +3,30 @@ set -euo pipefail
 
 # ClaudeStudio Server — deploy / update script
 # Usage: sudo bash deploy.sh
+# All paths can be overridden via environment variables:
+#   APP_DIR=/my/app DATA_DIR=/my/data sudo -E bash deploy.sh
 
-APP_DIR="/opt/claude-studio-server"
-DATA_DIR="/var/lib/claude-studio"
-CONF_DIR="/etc/claude-studio"
-SERVICE_USER="claude-studio"
-SERVICE_NAME="claude-studio-server"
+CONF_DIR="${CONF_DIR:-/etc/claude-studio}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Load existing config if present (so re-runs pick up changes to server.env)
+if [ -f "$CONF_DIR/server.env" ]; then
+  echo "  Loading existing config from $CONF_DIR/server.env"
+  set -a
+  source "$CONF_DIR/server.env"
+  set +a
+fi
+
+# Env vars > server.env > defaults
+APP_DIR="${APP_DIR:-/opt/claude-studio-server}"
+DATA_DIR="${DATA_DIR:-/var/lib/claude-studio}"
+SERVICE_USER="${SERVICE_USER:-claude-studio}"
+SERVICE_NAME="${SERVICE_NAME:-claude-studio-server}"
 
 echo "==> ClaudeStudio Server Deploy"
+echo "    APP_DIR:  $APP_DIR"
+echo "    DATA_DIR: $DATA_DIR"
+echo "    CONF_DIR: $CONF_DIR"
 
 # 1. Create system user if not exists
 if ! id "$SERVICE_USER" &>/dev/null; then
@@ -28,7 +44,7 @@ chmod 750 "$DATA_DIR"
 echo "  Setting up config..."
 mkdir -p "$CONF_DIR"
 if [ ! -f "$CONF_DIR/server.env" ]; then
-  cp .env.example "$CONF_DIR/server.env"
+  cp "$SCRIPT_DIR/.env.example" "$CONF_DIR/server.env"
   chmod 640 "$CONF_DIR/server.env"
   chown root:"$SERVICE_USER" "$CONF_DIR/server.env"
   echo "  Created $CONF_DIR/server.env (edit as needed)"
@@ -39,9 +55,9 @@ fi
 # 4. Copy application files
 echo "  Installing to $APP_DIR..."
 mkdir -p "$APP_DIR"
-cp -r dist/ "$APP_DIR/"
-cp package.json "$APP_DIR/"
-cp admin.mjs "$APP_DIR/"
+cp -r "$SCRIPT_DIR/dist/" "$APP_DIR/"
+cp "$SCRIPT_DIR/package.json" "$APP_DIR/"
+cp "$SCRIPT_DIR/admin.mjs" "$APP_DIR/"
 
 # 5. Install production dependencies
 echo "  Installing dependencies..."
@@ -53,16 +69,20 @@ chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR"
 echo "  Setting up admin CLI..."
 ln -sf "$APP_DIR/admin.mjs" /usr/local/bin/claude-studio-admin
 # Wrapper so DATA_DIR is always set
-cat > /usr/local/bin/cs-admin <<'WRAPPER'
+cat > /usr/local/bin/cs-admin <<WRAPPER
 #!/usr/bin/env bash
-export DATA_DIR="${DATA_DIR:-/var/lib/claude-studio}"
-exec node /opt/claude-studio-server/admin.mjs "$@"
+# Load config from server.env if not already set
+if [ -f ${CONF_DIR}/server.env ]; then
+  source ${CONF_DIR}/server.env
+fi
+export DATA_DIR="\${DATA_DIR:-${DATA_DIR}}"
+exec node ${APP_DIR}/admin.mjs "\$@"
 WRAPPER
 chmod +x /usr/local/bin/cs-admin
 
 # 7. Install systemd service
 echo "  Installing systemd service..."
-cp "$OLDPWD/claude-studio-server.service" /etc/systemd/system/"$SERVICE_NAME".service
+cp "$SCRIPT_DIR/claude-studio-server.service" /etc/systemd/system/"$SERVICE_NAME".service
 systemctl daemon-reload
 systemctl enable "$SERVICE_NAME"
 

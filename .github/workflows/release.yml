@@ -246,6 +246,7 @@ jobs:
           cp server/.env.example server-release/
           cp server/claude-studio-server.service server-release/
           cp server/deploy.sh server-release/
+          cp server/upgrade.sh server-release/
           cp server/README.md server-release/
           tar -czf claude-studio-server.tar.gz -C server-release .
 

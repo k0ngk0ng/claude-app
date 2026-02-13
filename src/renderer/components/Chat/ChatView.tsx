@@ -64,11 +64,13 @@ export function ChatView() {
     if (sessionId) {
       const savedPos = useTabStore.getState().getScrollPosition(sessionId);
       if (savedPos !== undefined) {
+        // Has a saved position — restore it
         pendingScrollRestore.current = savedPos;
         isRestoringScroll.current = true;
       } else {
-        pendingScrollRestore.current = null;
-        isRestoringScroll.current = false;
+        // No saved position (new tab / first open) — scroll to bottom
+        pendingScrollRestore.current = -1; // -1 = scroll to bottom
+        isRestoringScroll.current = true;
       }
     } else {
       pendingScrollRestore.current = null;
@@ -90,8 +92,12 @@ export function ChatView() {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         if (scrollRef.current) {
-          scrollRef.current.scrollTop = pos;
-          console.log(`[scroll] RESTORED scrollTop=${scrollRef.current.scrollTop}`);
+          if (pos === -1) {
+            // Scroll to bottom
+            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+          } else {
+            scrollRef.current.scrollTop = pos;
+          }
         }
         // Allow auto-scroll again after a short delay
         setTimeout(() => {

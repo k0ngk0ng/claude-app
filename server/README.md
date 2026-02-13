@@ -74,12 +74,44 @@ In dev (server directory): `npm run admin -- users`
 
 ## Update
 
+从 GitHub Release 下载最新的 server tarball 并更新：
+
 ```bash
-cd server
-git pull
-npm install
-npm run build
+# 1. 下载并解压新版本
+cd /tmp
+curl -L https://github.com/k0ngk0ng/claude-studio/releases/latest/download/claude-studio-server.tar.gz -o claude-studio-server.tar.gz
+mkdir -p claude-studio-server && tar xzf claude-studio-server.tar.gz -C claude-studio-server
+
+# 2. 更新（只替换代码并重启，不动配置和数据）
+cd claude-studio-server
+sudo bash upgrade.sh
+
+# 3. 清理
+rm -rf /tmp/claude-studio-server /tmp/claude-studio-server.tar.gz
+```
+
+`upgrade.sh` 从 `/etc/claude-studio/server.env` 读取配置，只更新应用文件并重启服务。
+首次部署请用 `deploy.sh`。
+
+### 修改配置后重新部署
+
+如果修改了 `DATA_DIR` 等路径配置：
+
+```bash
+# 1. 编辑配置
+sudo vi /etc/claude-studio/server.env
+
+# 2. 重新部署（自动读取新配置，创建目录、更新权限）
 sudo bash deploy.sh
+
+# 注意：如果改了 DATA_DIR，旧数据不会自动迁移，需要手动移动：
+# sudo mv /var/lib/claude-studio/* /new/data/dir/
+```
+
+也可以通过环境变量一次性覆盖（优先级高于 server.env）：
+
+```bash
+APP_DIR=/my/app DATA_DIR=/my/data sudo -E bash deploy.sh
 ```
 
 ## API
@@ -100,5 +132,5 @@ sudo bash deploy.sh
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3456` | Server port |
-| `DATA_DIR` | `~/.claude-studio` | Database & JWT secret location |
+| `DATA_DIR` | `/var/lib/claude-studio` (deploy) / `~/.claude-studio` (dev) | Database & JWT secret location |
 | `DISABLE_REGISTRATION` | `false` | Block new registrations |
