@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useAppStore, type ToolActivity } from '../stores/appStore';
 import { usePermissionStore } from '../stores/permissionStore';
 import { useSettingsStore } from '../stores/settingsStore';
+import { useTabStore } from '../stores/tabStore';
 import { debugLog } from '../stores/debugLogStore';
 import type { ContentBlock, Message, ToolUseInfo, PermissionRequestEvent } from '../types';
 
@@ -285,6 +286,25 @@ export function useClaude() {
         case 'system': {
           if (event.session_id) {
             debugLog('claude', `session started: ${event.session_id}`, event);
+
+            // Replace temp tab ID with real session ID
+            const tabState = useTabStore.getState();
+            const activeTab = tabState.getActiveTab();
+            if (activeTab && activeTab.isNew) {
+              const oldId = activeTab.id;
+              tabState.replaceTabId(oldId, event.session_id);
+
+              // Re-key sessionRuntime from temp ID to real session ID
+              const appState = useAppStore.getState();
+              const oldRuntime = appState.sessionRuntimes.get(oldId);
+              if (oldRuntime) {
+                const runtimes = new Map(appState.sessionRuntimes);
+                runtimes.delete(oldId);
+                runtimes.set(event.session_id, oldRuntime);
+                useAppStore.setState({ sessionRuntimes: runtimes });
+              }
+            }
+
             setCurrentSession({ id: event.session_id });
             // Trigger sessions reload — a new session may have been created
             // Use a short delay to let the JSONL file be written to disk
@@ -670,6 +690,17 @@ export function useClaude() {
 
           // Trigger sessions reload so new threads appear in sidebar
           window.dispatchEvent(new CustomEvent('claude:session-updated'));
+
+          // Update tab title from the first user message
+          const sessionId = event.session_id || useAppStore.getState().currentSession.id;
+          if (sessionId) {
+            const msgs = useAppStore.getState().currentSession.messages;
+            const firstUser = msgs.find((m) => m.role === 'user');
+            if (firstUser) {
+              const title = firstUser.content.slice(0, 80) || 'Thread';
+              useTabStore.getState().updateTab(sessionId, { title });
+            }
+          }
           break;
         }
 

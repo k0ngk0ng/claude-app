@@ -76,8 +76,8 @@ export function ThreadList() {
     return ids;
   }, [currentSession.processId, currentSession.id, sessionRuntimes]);
 
-  // Whether we have an unsaved new thread (no session_id yet)
-  const hasUntitledThread = currentSession.id === null;
+  // Whether we have an unsaved new thread (temp ID starting with "new-")
+  const hasUntitledThread = currentSession.id !== null && currentSession.id.startsWith('new-');
   const untitledProjectPath = currentSession.projectPath || currentProject.path;
 
   // Filter sessions by search query

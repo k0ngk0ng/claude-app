@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useAppStore } from '../stores/appStore';
+import { useTabStore } from '../stores/tabStore';
 import { debugLog } from '../stores/debugLogStore';
 import type { SessionInfo, Message, ContentBlock, ToolUseInfo } from '../types';
 
@@ -176,6 +177,15 @@ export function useSessions() {
   const selectSession = useCallback(
     async (session: SessionInfo) => {
       debugLog('session', `switching to session: ${session.id} (${session.projectName})`);
+
+      // Open/activate tab for this session (no duplicates)
+      useTabStore.getState().openTab({
+        id: session.id,
+        title: session.title || session.lastMessage || 'Thread',
+        isNew: false,
+        projectPath: session.projectPath,
+      });
+
       // Save current session's runtime state before switching
       saveCurrentRuntime();
 
@@ -240,13 +250,23 @@ export function useSessions() {
       // Save current session's runtime state before switching
       saveCurrentRuntime();
 
+      // Create a temp ID so runtime save/restore can distinguish this tab
+      const tempId = `new-${Date.now()}`;
       resetCurrentSession();
       setCurrentSession({
         projectPath,
         messages: [],
-        id: null,
+        id: tempId,
         processId: null,
         isStreaming: false,
+      });
+
+      // Open a new tab for this session
+      useTabStore.getState().openTab({
+        id: tempId,
+        title: 'New Thread',
+        isNew: true,
+        projectPath,
       });
     },
     [resetCurrentSession, setCurrentSession, saveCurrentRuntime]
@@ -286,6 +306,14 @@ export function useSessions() {
         messages,
         isStreaming: false,
         processId: null,
+      });
+
+      // Open a tab for the forked session
+      useTabStore.getState().openTab({
+        id: newSessionId,
+        title: messages[0]?.content?.slice(0, 80) || 'Forked thread',
+        isNew: false,
+        projectPath: effectivePath,
       });
 
       // Reload sidebar

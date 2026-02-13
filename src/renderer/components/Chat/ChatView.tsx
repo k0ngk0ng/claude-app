@@ -2,12 +2,20 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { usePermissionStore } from '../../stores/permissionStore';
+import { useTabStore } from '../../stores/tabStore';
 import { useSessions } from '../../hooks/useSessions';
 import { MessageBubble } from './MessageBubble';
 import { ToolCard } from './ToolCard';
 import { PermissionPrompt } from './PermissionPrompt';
 import { WelcomeScreen } from './WelcomeScreen';
 import { ChatSearch } from './ChatSearch';
+
+/**
+ * Global ref to the chat scroll container.
+ * Used by App.tsx to save scroll position before tab switch
+ * (before the DOM is torn down by loading state).
+ */
+export let chatScrollElement: HTMLDivElement | null = null;
 
 export function ChatView() {
   const { currentSession, streamingContent, toolActivities, isLoadingSession } = useAppStore();
@@ -18,8 +26,17 @@ export function ChatView() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [showSearch, setShowSearch] = useState(false);
 
-  const { messages, isStreaming } = currentSession;
+  const { messages, isStreaming, id: sessionId } = currentSession;
   const hasMessages = messages.length > 0;
+  const pendingScrollRestore = useRef<number | null>(null);
+  // Track whether we're in a "just switched tab" state to suppress auto-scroll
+  const isRestoringScroll = useRef(false);
+
+  // Keep global ref in sync with scrollRef
+  useEffect(() => {
+    chatScrollElement = scrollRef.current;
+    return () => { chatScrollElement = null; };
+  });
 
   // Only allow fork when we have a saved session (not streaming, has session id)
   const canFork = !!currentSession.id && !isStreaming;
@@ -29,12 +46,55 @@ export function ChatView() {
     forkSession(messageId);
   }, [canFork, forkSession]);
 
-  // Auto-scroll to bottom on new messages, streaming content, tool activities, or permission requests
+  // When sessionId changes, check if there's a saved scroll position to restore
   useEffect(() => {
-    if (bottomRef.current) {
+    if (sessionId) {
+      const savedPos = useTabStore.getState().getScrollPosition(sessionId);
+      if (savedPos !== undefined) {
+        pendingScrollRestore.current = savedPos;
+        isRestoringScroll.current = true;
+      } else {
+        pendingScrollRestore.current = null;
+        isRestoringScroll.current = false;
+      }
+    } else {
+      pendingScrollRestore.current = null;
+      isRestoringScroll.current = false;
+    }
+  }, [sessionId]);
+
+  // Try to restore scroll position whenever messages change or loading finishes
+  useEffect(() => {
+    if (pendingScrollRestore.current === null) return;
+    if (!scrollRef.current) return;
+    if (messages.length === 0) return;
+    if (isLoadingSession) return;
+
+    const pos = pendingScrollRestore.current;
+    pendingScrollRestore.current = null;
+
+    // Use multiple rAF to ensure DOM is fully rendered
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = pos;
+          console.log(`[scroll] RESTORED scrollTop=${scrollRef.current.scrollTop}`);
+        }
+        // Allow auto-scroll again after a short delay
+        setTimeout(() => {
+          isRestoringScroll.current = false;
+        }, 200);
+      });
+    });
+  }, [messages, isLoadingSession]);
+
+  // Auto-scroll to bottom only when streaming (new content arriving), not during tab restore
+  useEffect(() => {
+    if (isRestoringScroll.current) return;
+    if (isStreaming && bottomRef.current) {
       bottomRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages.length, streamingContent, toolActivities.length, pendingRequests.length]);
+  }, [isStreaming, messages.length, streamingContent, toolActivities.length, pendingRequests.length]);
 
   // Cmd/Ctrl+F to open search
   useEffect(() => {
