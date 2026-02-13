@@ -637,7 +637,27 @@ export function useClaude() {
             }
           } else if (!lastTurnText && finalTools.length === 0 && turnCountRef.current <= 1) {
             // Single-turn with no streaming text — try event.result as fallback
-            const fallbackText = typeof event.result === 'string' ? event.result : '';
+            let fallbackText = typeof event.result === 'string' ? event.result : '';
+
+            // SDK slash commands return XML-wrapped responses — parse them
+            if (fallbackText.includes('<local-command-caveat>') || fallbackText.includes('<command-name>')) {
+              const cmdMatch = fallbackText.match(/<command-name>\/?([^<]+)<\/command-name>/);
+              const msgMatch = fallbackText.match(/<command-message>([\s\S]*?)<\/command-message>/);
+              const cmdName = cmdMatch?.[1] || '';
+              const cmdMessage = msgMatch?.[1]?.trim() || '';
+
+              // Strip all XML tags to get clean text
+              const cleanText = fallbackText
+                .replace(/<[^>]+>/g, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+
+              // For most slash commands, the XML response is just metadata — show a clean summary
+              if (cmdName) {
+                fallbackText = cmdMessage || cleanText || `/${cmdName} completed`;
+                debugLog('claude', `slash command result: /${cmdName} → ${fallbackText.slice(0, 100)}`);
+              }
+            }
 
             // Check if this is an error result (e.g. error_during_execution)
             if (event.subtype === 'error_during_execution' || event.is_error) {

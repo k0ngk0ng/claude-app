@@ -15,7 +15,7 @@ import { InputBar } from './components/InputBar/InputBar';
 import { BottomPanel } from './components/BottomPanel/BottomPanel';
 import { RightPanel } from './components/DiffPanel/RightPanel';
 import { Settings } from './components/Settings/Settings';
-import { LOCAL_COMMANDS, BUILTIN_COMMANDS } from './components/InputBar/SlashCommandPopup';
+import { LOCAL_COMMANDS, TERMINAL_ONLY_COMMANDS, BUILTIN_COMMANDS } from './components/InputBar/SlashCommandPopup';
 
 export default function App() {
   const { panels, togglePanel, setCurrentProject, setPlatform, currentProject } =
@@ -241,6 +241,17 @@ export default function App() {
       if (!LOCAL_COMMANDS.has(cmd)) return false;
 
       const { addMessage, clearMessages } = useAppStore.getState();
+
+      // Terminal-only commands — show hint instead of sending to SDK
+      if (TERMINAL_ONLY_COMMANDS.has(cmd)) {
+        addMessage({
+          id: `local-${cmd}-${Date.now()}`,
+          role: 'system',
+          content: `\`/${cmd}\` requires an interactive terminal. Run \`claude /${cmd}\` in the built-in terminal (⌘T) or your system terminal.`,
+          timestamp: new Date().toISOString(),
+        });
+        return true;
+      }
 
       switch (cmd) {
         case 'clear': {

@@ -12,28 +12,34 @@ export interface SlashItem {
 }
 
 /** Commands handled entirely in the GUI */
-export const LOCAL_COMMANDS = new Set(['clear', 'config', 'help']);
+export const LOCAL_COMMANDS = new Set(['clear', 'config', 'help', 'bug', 'doctor', 'init', 'login', 'logout', 'terminal-setup', 'vim']);
+
+/**
+ * Commands that require an interactive terminal and can't work through the SDK.
+ * These will show a hint to the user instead of being sent.
+ */
+export const TERMINAL_ONLY_COMMANDS = new Set(['bug', 'doctor', 'init', 'login', 'logout', 'terminal-setup', 'vim']);
 
 export const BUILTIN_COMMANDS: SlashItem[] = [
   { name: 'add-dir', description: 'Add additional directories to the current session context', argumentHint: '<directory>', source: 'builtin' },
-  { name: 'bug', description: 'Report bugs in Claude Code (creates GitHub issue)', argumentHint: '[description]', source: 'builtin' },
+  { name: 'bug', description: 'Report bugs — requires terminal (claude /bug)', argumentHint: '[description]', source: 'builtin', local: true },
   { name: 'clear', description: 'Clear conversation history and free up context', argumentHint: '', source: 'builtin', local: true },
   { name: 'compact', description: 'Compact conversation to save context space', argumentHint: '[instructions]', source: 'builtin' },
   { name: 'config', description: 'Open settings', argumentHint: '', source: 'builtin', local: true },
   { name: 'context', description: 'Manage context files and directories for the session', argumentHint: '', source: 'builtin' },
   { name: 'cost', description: 'Show token usage and cost for this session', argumentHint: '', source: 'builtin' },
-  { name: 'doctor', description: 'Check the health of your Claude Code installation', argumentHint: '', source: 'builtin' },
+  { name: 'doctor', description: 'Check installation health — requires terminal (claude /doctor)', argumentHint: '', source: 'builtin', local: true },
   { name: 'help', description: 'Show available commands and usage information', argumentHint: '', source: 'builtin', local: true },
-  { name: 'init', description: 'Initialize a new CLAUDE.md project guide', argumentHint: '', source: 'builtin' },
-  { name: 'login', description: 'Switch accounts or re-authenticate', argumentHint: '', source: 'builtin' },
-  { name: 'logout', description: 'Sign out of your current account', argumentHint: '', source: 'builtin' },
+  { name: 'init', description: 'Initialize CLAUDE.md — requires terminal (claude /init)', argumentHint: '', source: 'builtin', local: true },
+  { name: 'login', description: 'Switch accounts — requires terminal (claude /login)', argumentHint: '', source: 'builtin', local: true },
+  { name: 'logout', description: 'Sign out — requires terminal (claude /logout)', argumentHint: '', source: 'builtin', local: true },
   { name: 'memory', description: 'Edit CLAUDE.md memory files', argumentHint: '', source: 'builtin' },
   { name: 'model', description: 'Switch or display the current AI model', argumentHint: '[model-name]', source: 'builtin' },
   { name: 'permissions', description: 'View or update tool permissions', argumentHint: '', source: 'builtin' },
   { name: 'review', description: 'Review a pull request or set of changes', argumentHint: '[pr-url]', source: 'builtin' },
   { name: 'status', description: 'Show current session status and configuration', argumentHint: '', source: 'builtin' },
-  { name: 'terminal-setup', description: 'Install Shift+Enter key binding for newlines', argumentHint: '', source: 'builtin' },
-  { name: 'vim', description: 'Enter vim mode for keyboard-driven editing', argumentHint: '', source: 'builtin' },
+  { name: 'terminal-setup', description: 'Install key bindings — requires terminal', argumentHint: '', source: 'builtin', local: true },
+  { name: 'vim', description: 'Vim mode — requires terminal (claude /vim)', argumentHint: '', source: 'builtin', local: true },
 ];
 
 // ─── Component ──────────────────────────────────────────────────────
