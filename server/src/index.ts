@@ -2,9 +2,15 @@ import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import { initDatabase } from './db.js';
 import { authRoutes } from './routes/auth.js';
 import { settingsRoutes } from './routes/settings.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'));
 
 const PORT = parseInt(process.env.PORT || '3456', 10);
 
@@ -24,7 +30,7 @@ app.use('*', cors({
 // Health check
 app.get('/api/health', (c) => c.json({
   status: 'ok',
-  version: '0.0.1',
+  version: pkg.version,
   registrationDisabled: process.env.DISABLE_REGISTRATION === 'true',
 }));
 
