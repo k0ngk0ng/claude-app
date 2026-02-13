@@ -248,9 +248,9 @@ jobs:
           cp server/deploy.sh server-release/
           cp server/upgrade.sh server-release/
           cp server/README.md server-release/
-          # Install production deps into tarball
+          # Install production deps into tarball (no --ignore-scripts, better-sqlite3 needs native build)
           cd server-release
-          npm install --omit=dev --ignore-scripts
+          npm install --omit=dev
           cd ..
           tar -czf claude-studio-server.tar.gz -C server-release .
 
