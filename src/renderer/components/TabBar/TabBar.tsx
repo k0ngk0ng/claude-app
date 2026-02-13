@@ -26,11 +26,25 @@ export function TabBar({ onTabSelect, onTabClose, onNewThread }: TabBarProps) {
   if (openTabs.length === 0) return null;
 
   return (
-    <div className="flex items-center bg-bg border-b border-border shrink-0 h-10 min-h-[40px]">
+    <div
+      className="flex items-center bg-bg border-b border-border shrink-0 h-10 min-h-[40px]"
+      onDoubleClick={(e) => {
+        // Double-click on empty area (not on a tab or button) → new thread
+        if (e.target === e.currentTarget || (e.target as HTMLElement).closest('[data-tab-empty]')) {
+          onNewThread();
+        }
+      }}
+    >
       {/* Scrollable tab area */}
       <div
         ref={scrollRef}
         className="flex-1 flex items-stretch overflow-x-auto min-w-0 scrollbar-none"
+        onDoubleClick={(e) => {
+          // Double-click on empty space within scroll area → new thread
+          if (e.target === e.currentTarget) {
+            onNewThread();
+          }
+        }}
       >
         {openTabs.map((tab) => {
           const isActive = tab.id === activeTabId;
@@ -41,6 +55,7 @@ export function TabBar({ onTabSelect, onTabClose, onNewThread }: TabBarProps) {
               key={tab.id}
               onMouseDown={(e) => handleMouseDown(e, tab)}
               onClick={() => onTabSelect(tab)}
+              onDoubleClick={(e) => e.stopPropagation()}
               className={`
                 group relative flex items-center gap-1.5 px-3 h-full
                 cursor-pointer select-none shrink-0 max-w-[200px] min-w-[100px]
@@ -93,25 +108,26 @@ export function TabBar({ onTabSelect, onTabClose, onNewThread }: TabBarProps) {
             </div>
           );
         })}
-      </div>
 
-      {/* New tab button */}
-      <button
-        onClick={onNewThread}
-        className="flex items-center justify-center w-9 h-full shrink-0
-                   text-text-muted hover:text-text-primary hover:bg-surface-hover
-                   transition-colors border-r border-border"
-        title="New thread (⌘N)"
-      >
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-          <path
-            d="M6 2v8M2 6h8"
-            stroke="currentColor"
-            strokeWidth="1.3"
-            strokeLinecap="round"
-          />
-        </svg>
-      </button>
+        {/* New tab button — right after the last tab */}
+        <button
+          onClick={onNewThread}
+          onDoubleClick={(e) => e.stopPropagation()}
+          className="flex items-center justify-center w-9 h-full shrink-0
+                     text-text-muted hover:text-text-primary hover:bg-surface-hover
+                     transition-colors"
+          title="New thread (⌘N)"
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path
+              d="M6 2v8M2 6h8"
+              stroke="currentColor"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 }

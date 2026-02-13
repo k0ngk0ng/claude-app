@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { FileSearchPopup } from './FileSearchPopup';
-import type { AppearanceSettings } from '../../types';
+import { SlashCommandPopup } from './SlashCommandPopup';
+import type { AppearanceSettings, CommandInfo } from '../../types';
 
 const LAYOUT_CLASS: Record<AppearanceSettings['chatLayout'], string> = {
   'centered-sm': 'max-w-xl mx-auto',
@@ -51,6 +52,13 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
   const [fileSearchVisible, setFileSearchVisible] = useState(false);
   const [fileSearchQuery, setFileSearchQuery] = useState('');
   const [atTriggerIndex, setAtTriggerIndex] = useState(-1);
+  // / slash command state
+  const [slashVisible, setSlashVisible] = useState(false);
+  const [slashQuery, setSlashQuery] = useState('');
+  // Message history navigation
+  const historyRef = useRef<string[]>([]);
+  const historyIndexRef = useRef(-1);
+  const savedInputRef = useRef('');
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -118,6 +126,28 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
     textareaRef.current?.focus();
   }, []);
 
+  // Seed history from current session's user messages
+  useEffect(() => {
+    const messages = useAppStore.getState().currentSession.messages;
+    if (messages && messages.length > 0) {
+      const userMsgs = messages
+        .filter((m) => m.role === 'user' && m.content)
+        .map((m) => m.content)
+        .reverse();
+      // Deduplicate, keep most recent first
+      const seen = new Set<string>();
+      const deduped: string[] = [];
+      for (const msg of userMsgs) {
+        if (!seen.has(msg)) {
+          seen.add(msg);
+          deduped.push(msg);
+        }
+      }
+      historyRef.current = deduped.slice(0, 50);
+    }
+    historyIndexRef.current = -1;
+  }, [useAppStore.getState().currentSession.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Handle paste for images (Cmd+V / Ctrl+V)
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const items = e.clipboardData?.items;
@@ -180,12 +210,32 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
     }
   }, [showNewBranch]);
 
-  // Detect @ trigger in textarea
+  // Detect @ trigger and / slash command in textarea
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value;
     const cursorPos = e.target.selectionStart || 0;
     setValue(newValue);
 
+    // Reset history browsing when user types
+    historyIndexRef.current = -1;
+
+    // ─── Slash command detection ───────────────────────────────
+    if (newValue.startsWith('/')) {
+      const query = newValue.slice(1).split(/\s/)[0]; // first word after /
+      // Only show popup if cursor is still in the command name (no space yet)
+      if (!newValue.slice(1).includes(' ') && !newValue.includes('\n')) {
+        setSlashVisible(true);
+        setSlashQuery(query);
+      } else {
+        setSlashVisible(false);
+        setSlashQuery('');
+      }
+    } else {
+      setSlashVisible(false);
+      setSlashQuery('');
+    }
+
+    // ─── @ file search detection ──────────────────────────────
     // Check if we just typed @ or are continuing to type after @
     if (fileSearchVisible) {
       // Already in search mode — update query
@@ -245,6 +295,21 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
     textareaRef.current?.focus();
   }, []);
 
+  // Handle slash command selection
+  const handleSlashSelect = useCallback((cmd: CommandInfo) => {
+    // Replace the /query with the full command invocation
+    setValue(`/${cmd.name} `);
+    setSlashVisible(false);
+    setSlashQuery('');
+    textareaRef.current?.focus();
+  }, []);
+
+  const handleSlashClose = useCallback(() => {
+    setSlashVisible(false);
+    setSlashQuery('');
+    textareaRef.current?.focus();
+  }, []);
+
   // Load branches when dropdown opens — use currentProject.path with fallback
   const loadBranches = useCallback(async () => {
     const projectPath = currentProject.path || useAppStore.getState().currentSession.projectPath;
@@ -296,15 +361,26 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
   }, [newBranchName, currentProject.path, setBranch]);
 
   const handleSubmit = useCallback(() => {
-    // Close file search if open
+    // Close popups if open
     if (fileSearchVisible) {
       setFileSearchVisible(false);
       setAtTriggerIndex(-1);
       setFileSearchQuery('');
     }
+    if (slashVisible) {
+      setSlashVisible(false);
+      setSlashQuery('');
+    }
 
     const trimmed = value.trim();
     if (!trimmed && attachments.length === 0) return;
+
+    // Save to message history
+    if (trimmed) {
+      historyRef.current = [trimmed, ...historyRef.current.filter(h => h !== trimmed)].slice(0, 50);
+      historyIndexRef.current = -1;
+      savedInputRef.current = '';
+    }
 
     // Build message with attachment references
     let message = trimmed;
@@ -320,22 +396,68 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
     setAttachments([]);
     // Reset to default height after sending
     setInputHeight(64);
-  }, [value, attachments, isStreaming, onSend, fileSearchVisible]);
+  }, [value, attachments, isStreaming, onSend, fileSearchVisible, slashVisible]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      // Don't handle Enter/Escape when file search is open — let FileSearchPopup handle it
+      // Don't handle keys when file search or slash popup is open — let popup handle it
       if (fileSearchVisible) {
         if (e.key === 'Enter' || e.key === 'Escape' || e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Tab') {
           return; // Let the popup's global keydown handler take over
         }
       }
+      if (slashVisible) {
+        if (e.key === 'Enter' || e.key === 'Escape' || e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Tab') {
+          return;
+        }
+      }
+
+      // ─── Up/Down arrow: message history ─────────────────────
+      if (e.key === 'ArrowUp' && !e.shiftKey) {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+        // Only trigger if cursor is at the very start (or input is empty)
+        const atStart = textarea.selectionStart === 0 && textarea.selectionEnd === 0;
+        const isEmpty = value === '';
+        if ((atStart || isEmpty) && historyRef.current.length > 0) {
+          e.preventDefault();
+          if (historyIndexRef.current === -1) {
+            savedInputRef.current = value;
+          }
+          const nextIdx = Math.min(historyIndexRef.current + 1, historyRef.current.length - 1);
+          historyIndexRef.current = nextIdx;
+          setValue(historyRef.current[nextIdx]);
+        }
+        return;
+      }
+      if (e.key === 'ArrowDown' && !e.shiftKey) {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+        // Only trigger if we're browsing history
+        if (historyIndexRef.current >= 0) {
+          const atEnd = textarea.selectionStart === value.length && textarea.selectionEnd === value.length;
+          if (atEnd) {
+            e.preventDefault();
+            const nextIdx = historyIndexRef.current - 1;
+            if (nextIdx < 0) {
+              historyIndexRef.current = -1;
+              setValue(savedInputRef.current);
+            } else {
+              historyIndexRef.current = nextIdx;
+              setValue(historyRef.current[nextIdx]);
+            }
+            return;
+          }
+        }
+        return;
+      }
+
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         handleSubmit();
       }
     },
-    [handleSubmit, fileSearchVisible]
+    [handleSubmit, fileSearchVisible, slashVisible, value]
   );
 
   const handleAddFile = () => {
@@ -399,6 +521,13 @@ export function InputBar({ onSend, isStreaming, onStop }: InputBarProps) {
             onSelect={handleFileSelect}
             onClose={handleFileSearchClose}
             anchorRef={textareaRef}
+          />
+          {/* / Slash command popup */}
+          <SlashCommandPopup
+            query={slashQuery}
+            visible={slashVisible}
+            onSelect={handleSlashSelect}
+            onClose={handleSlashClose}
           />
 
           {/* Attachment previews */}
