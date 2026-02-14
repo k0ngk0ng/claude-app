@@ -82,18 +82,6 @@ const navItems: NavItem[] = [
     ),
   },
   {
-    id: 'git',
-    label: 'Git',
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-        <circle cx="5" cy="4" r="1.5" stroke="currentColor" strokeWidth="1.3" />
-        <circle cx="11" cy="4" r="1.5" stroke="currentColor" strokeWidth="1.3" />
-        <circle cx="5" cy="12" r="1.5" stroke="currentColor" strokeWidth="1.3" />
-        <path d="M5 5.5v5M9.5 4H6.5" stroke="currentColor" strokeWidth="1.3" />
-      </svg>
-    ),
-  },
-  {
     id: 'appearance',
     label: 'Appearance',
     icon: (
@@ -120,16 +108,23 @@ const navItems: NavItem[] = [
     ),
   },
   {
-    id: 'server',
-    label: 'Server',
+    id: 'account',
+    label: 'Account',
     icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-        <rect x="2" y="2" width="12" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
-        <rect x="2" y="9" width="12" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
-        <circle cx="4.5" cy="4.5" r="0.75" fill="currentColor" />
-        <circle cx="4.5" cy="11.5" r="0.75" fill="currentColor" />
-        <path d="M7 4.5h4" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
-        <path d="M7 11.5h4" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+        <circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.3" />
+        <path d="M2.5 14c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    id: 'remote',
+    label: 'Remote Control',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <rect x="4" y="1.5" width="8" height="13" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+        <circle cx="8" cy="11.5" r="0.75" fill="currentColor" />
+        <line x1="6" y1="4" x2="10" y2="4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
       </svg>
     ),
   },

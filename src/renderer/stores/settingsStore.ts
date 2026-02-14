@@ -14,6 +14,7 @@ import type {
   GitSettings,
   AppearanceSettings,
   KeyBinding,
+  SecuritySettings,
   ServerSettings,
 } from '../types';
 
@@ -69,6 +70,11 @@ const defaultSettings: AppSettings = {
     { id: 'send-message', label: 'Send Message', keys: 'Enter', action: 'sendMessage' },
     { id: 'new-line', label: 'New Line in Input', keys: 'Shift+Enter', action: 'newLine' },
   ],
+  security: {
+    lockPassword: '666666',
+    allowRemoteControl: true,
+    autoLockTimeout: 0,
+  },
   server: {
     serverUrl: '',
   },
@@ -139,6 +145,7 @@ function mergeWithDefaults(parsed: Record<string, unknown>): AppSettings {
     git: { ...defaultSettings.git, ...(parsed.git as Partial<GitSettings>) },
     appearance: { ...defaultSettings.appearance, ...(parsed.appearance as Partial<AppearanceSettings>) },
     keybindings: (parsed.keybindings as KeyBinding[])?.length ? (parsed.keybindings as KeyBinding[]) : defaultSettings.keybindings,
+    security: { ...defaultSettings.security, ...(parsed.security as Partial<SecuritySettings>) },
     server: { ...defaultSettings.server, ...(parsed.server as Partial<ServerSettings>) },
   };
 
@@ -207,6 +214,7 @@ interface SettingsStore {
   updatePermissions: (updates: Partial<PermissionSettings>) => void;
   updateGit: (updates: Partial<GitSettings>) => void;
   updateAppearance: (updates: Partial<AppearanceSettings>) => void;
+  updateSecurity: (updates: Partial<SecuritySettings>) => void;
   updateServer: (updates: Partial<ServerSettings>) => void;
   updateKeybinding: (id: string, keys: string) => void;
 
@@ -289,6 +297,17 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       const newSettings = {
         ...state.settings,
         appearance: { ...state.settings.appearance, ...updates },
+      };
+      saveSettings(newSettings);
+      return { settings: newSettings };
+    });
+  },
+
+  updateSecurity: (updates) => {
+    set((state) => {
+      const newSettings = {
+        ...state.settings,
+        security: { ...state.settings.security, ...updates },
       };
       saveSettings(newSettings);
       return { settings: newSettings };

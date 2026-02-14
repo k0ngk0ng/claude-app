@@ -17,6 +17,8 @@ import { BottomPanel } from './components/BottomPanel/BottomPanel';
 import { RightPanel } from './components/DiffPanel/RightPanel';
 import { Settings } from './components/Settings/Settings';
 import { LoginModal } from './components/Auth/LoginModal';
+import { LockOverlay } from './components/Remote/LockOverlay';
+import { initRemoteListeners } from './stores/remoteStore';
 import { LOCAL_COMMANDS, TERMINAL_ONLY_COMMANDS, SDK_SESSION_COMMANDS, BUILTIN_COMMANDS } from './components/InputBar/SlashCommandPopup';
 
 export default function App() {
@@ -103,6 +105,12 @@ export default function App() {
     }
 
     init();
+  }, []);
+
+  // Initialize remote control event listeners
+  useEffect(() => {
+    const cleanup = initRemoteListeners();
+    return cleanup;
   }, []);
 
   // Auto-reload sessions when files change
@@ -420,6 +428,16 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [togglePanel, openSettings, closeSettings, settingsOpen, handleNewThread, handleTabClose, handleTabSelect]);
 
+  // Listen for AskUserQuestion answers from ChatView
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const answer = (e as CustomEvent<string>).detail;
+      if (answer) handleSendMessage(answer);
+    };
+    window.addEventListener('claude:user-answer', handler);
+    return () => window.removeEventListener('claude:user-answer', handler);
+  }, [handleSendMessage]);
+
   // Show settings page when open
   if (settingsOpen) {
     return <Settings />;
@@ -429,6 +447,9 @@ export default function App() {
     <div className="flex h-screen w-screen overflow-hidden bg-bg">
       {/* Login modal */}
       <LoginModal />
+
+      {/* Remote control lock overlay */}
+      <LockOverlay />
 
       {/* Sidebar */}
       {panels.sidebar && (

@@ -496,6 +496,7 @@ class ClaudeProcessManager extends EventEmitter {
 
   kill(processId: string): boolean {
     const managed = this.sessions.get(processId);
+    console.log(`[claude-process] kill called for ${processId}, found=${!!managed}`);
     if (!managed) return false;
 
     // Signal input stream to stop

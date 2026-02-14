@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { createUser, verifyPassword, getUserById, updateUser } from '../db.js';
+import { createUser, verifyPassword, getUserById, updateUser, changePassword } from '../db.js';
 import { signToken, verifyToken } from '../auth.js';
 
 export const authRoutes = new Hono();
@@ -84,4 +84,24 @@ authRoutes.put('/profile', async (c) => {
   }
 
   return c.json({ success: true, user: result.user });
+});
+
+// PUT /api/auth/password
+authRoutes.put('/password', async (c) => {
+  const user = await getUserFromToken(c.req.header('Authorization'));
+  if (!user) {
+    return c.json({ success: false, error: 'Unauthorized' }, 401);
+  }
+
+  const { oldPassword, newPassword } = await c.req.json();
+  if (!oldPassword || !newPassword) {
+    return c.json({ success: false, error: 'Both old and new passwords are required' }, 400);
+  }
+
+  const result = changePassword(user.id, oldPassword, newPassword);
+  if ('error' in result) {
+    return c.json({ success: false, error: result.error }, 400);
+  }
+
+  return c.json({ success: true });
 });

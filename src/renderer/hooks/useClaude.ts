@@ -451,14 +451,35 @@ export function useClaude() {
               // Tool use block finished — keep as running until we get the result
               // Save the final full input
               if (currentToolIdRef.current) {
-                const { toolActivities } = useAppStore.getState();
+                const { toolActivities, setPendingQuestion } = useAppStore.getState();
+                const toolId = currentToolIdRef.current;
+                const activity = toolActivities.find(a => a.id === toolId);
+
                 useAppStore.setState({
                   toolActivities: toolActivities.map(a =>
-                    a.id === currentToolIdRef.current
+                    a.id === toolId
                       ? { ...a, inputFull: toolInputJsonRef.current || a.inputFull }
                       : a
                   ),
                 });
+
+                // Detect AskUserQuestion tool — show interactive question card
+                if (activity?.name === 'AskUserQuestion' && toolInputJsonRef.current) {
+                  try {
+                    const parsed = JSON.parse(toolInputJsonRef.current);
+                    if (parsed.questions && Array.isArray(parsed.questions)) {
+                      debugLog('claude', `AskUserQuestion detected: ${parsed.questions.length} question(s)`, parsed);
+                      setPendingQuestion({
+                        toolId,
+                        questions: parsed.questions,
+                        answered: false,
+                      });
+                    }
+                  } catch {
+                    debugLog('claude', 'AskUserQuestion: failed to parse input JSON', undefined, 'warn');
+                  }
+                }
+
                 currentToolIdRef.current = null;
                 toolInputJsonRef.current = '';
               }
@@ -934,8 +955,10 @@ export function useClaude() {
   }, []);
 
   const stopSession = useCallback(async () => {
+    debugLog('claude', `stopSession called, processIdRef=${processIdRef.current}`);
     if (processIdRef.current) {
       await window.api.claude.kill(processIdRef.current);
+      debugLog('claude', `kill sent for ${processIdRef.current}`);
       processIdRef.current = null;
       const { setProcessId, setIsStreaming, clearStreamingContent, clearToolActivities } =
         useAppStore.getState();

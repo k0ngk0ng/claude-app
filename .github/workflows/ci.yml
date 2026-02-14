@@ -8,7 +8,7 @@ on:
 
 jobs:
   typecheck:
-    name: Type Check
+    name: Type Check (Desktop)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -26,6 +26,50 @@ jobs:
         run: npm ci
 
       - name: Type check
+        run: npx tsc --noEmit
+
+  typecheck-server:
+    name: Type Check (Server)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Type check
+        working-directory: server
+        run: npx tsc --noEmit
+
+  typecheck-mobile:
+    name: Type Check (Mobile)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        working-directory: mobile
+        run: npm ci
+
+      - name: Type check
+        working-directory: mobile
         run: npx tsc --noEmit
 
   build-macos:

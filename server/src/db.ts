@@ -152,6 +152,18 @@ export function updateUser(userId: string, updates: { username?: string; avatarU
   return { user };
 }
 
+export function changePassword(userId: string, oldPassword: string, newPassword: string): { success: boolean } | { error: string } {
+  const d = getDb();
+  const row = d.prepare('SELECT * FROM users WHERE id = ?').get(userId) as any;
+  if (!row) return { error: 'User not found' };
+  if (!bcrypt.compareSync(oldPassword, row.password)) return { error: 'Current password is incorrect' };
+  if (newPassword.length < 6) return { error: 'New password must be at least 6 characters' };
+
+  const hashed = bcrypt.hashSync(newPassword, BCRYPT_ROUNDS);
+  d.prepare('UPDATE users SET password = ?, updated_at = ? WHERE id = ?').run(hashed, Date.now(), userId);
+  return { success: true };
+}
+
 export function getUserSettings(userId: string): Record<string, unknown> {
   const d = getDb();
   const rows = d.prepare('SELECT key, value FROM user_settings WHERE user_id = ?').all(userId) as any[];

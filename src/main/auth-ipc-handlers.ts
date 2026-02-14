@@ -4,6 +4,7 @@ import path from 'path';
 import os from 'os';
 
 const DEFAULT_SERVER_URL = 'http://localhost:3456';
+const AUTH_TOKEN_PATH = path.join(os.homedir(), '.claude-studio', 'auth-token.json');
 
 // Priority: settings.json > build-time env > default
 function getServerUrl(): string {
@@ -44,6 +45,38 @@ export function registerAuthIpcHandlers(): void {
   // Expose the effective server URL to renderer (for Settings display)
   ipcMain.handle('auth:getServerUrl', async () => {
     return getServerUrl();
+  });
+
+  // ─── Token persistence (file-based, survives dev server restarts) ───
+
+  ipcMain.handle('auth:saveToken', async (_event, token: string) => {
+    try {
+      const dir = path.dirname(AUTH_TOKEN_PATH);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(AUTH_TOKEN_PATH, JSON.stringify({ token }), 'utf-8');
+      return true;
+    } catch {
+      return false;
+    }
+  });
+
+  ipcMain.handle('auth:loadToken', async () => {
+    try {
+      if (!fs.existsSync(AUTH_TOKEN_PATH)) return null;
+      const data = JSON.parse(fs.readFileSync(AUTH_TOKEN_PATH, 'utf-8'));
+      return data?.token || null;
+    } catch {
+      return null;
+    }
+  });
+
+  ipcMain.handle('auth:clearToken', async () => {
+    try {
+      if (fs.existsSync(AUTH_TOKEN_PATH)) fs.unlinkSync(AUTH_TOKEN_PATH);
+      return true;
+    } catch {
+      return false;
+    }
   });
 
   // Expose the build-time default (so renderer knows what the "default" is)
@@ -114,6 +147,19 @@ export function registerAuthIpcHandlers(): void {
         method: 'PUT',
         headers: authHeaders(token),
         body: JSON.stringify(updates),
+      });
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Server unavailable' };
+    }
+  });
+
+  ipcMain.handle('auth:changePassword', async (_event, token: string, oldPassword: string, newPassword: string) => {
+    try {
+      if (!token) return { success: false, error: 'Unauthorized' };
+      return await serverFetch('/api/auth/password', {
+        method: 'PUT',
+        headers: authHeaders(token),
+        body: JSON.stringify({ oldPassword, newPassword }),
       });
     } catch (err: any) {
       return { success: false, error: err.message || 'Server unavailable' };

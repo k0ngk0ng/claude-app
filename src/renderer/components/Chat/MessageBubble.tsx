@@ -5,6 +5,7 @@ import rehypeHighlight from 'rehype-highlight';
 import type { Message, StreamingCursorStyle } from '../../types';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { ToolCard } from './ToolCard';
+import { AskUserQuestionCard } from './AskUserQuestionCard';
 
 /* ── Streaming cursor styles ─────────────────────────────────────── */
 
@@ -417,6 +418,28 @@ export function MessageBubble({ message, hideAvatar, onFork }: MessageBubbleProp
         {message.toolUse && message.toolUse.length > 0 && (
           <div className="mt-2 space-y-1.5">
             {message.toolUse.map((tool, idx) => {
+              // AskUserQuestion — render as read-only question card
+              if (tool.name === 'AskUserQuestion' && tool.input?.questions) {
+                const questions = tool.input.questions as Array<{
+                  header: string;
+                  question: string;
+                  multiSelect: boolean;
+                  options: Array<{ label: string; description: string }>;
+                }>;
+                // Try to extract the selected answer from the tool result
+                const selectedAnswers = tool.result
+                  ? [tool.result]
+                  : undefined;
+                return (
+                  <AskUserQuestionCard
+                    key={idx}
+                    questions={questions}
+                    answered
+                    selectedAnswers={selectedAnswers}
+                  />
+                );
+              }
+
               // Extract a brief input description from common fields
               const input = tool.input;
               const brief =

@@ -8,10 +8,10 @@ import { PermissionsSection } from './PermissionsSection';
 import { McpServersSection } from './McpServersSection';
 import { SkillsSection } from './SkillsSection';
 import { CommandsSection } from './CommandsSection';
-import { GitSection } from './GitSection';
 import { AppearanceSection } from './AppearanceSection';
 import { KeybindingsSection } from './KeybindingsSection';
-import { ServerSection } from './ServerSection';
+import { RemoteControlSection } from './RemoteControlSection';
+import { AccountSection } from './AccountSection';
 import { AboutSection } from './AboutSection';
 
 export function Settings() {
@@ -33,14 +33,14 @@ export function Settings() {
         return <CommandsSection />;
       case 'mcp-servers':
         return <McpServersSection />;
-      case 'git':
-        return <GitSection />;
       case 'appearance':
         return <AppearanceSection />;
       case 'keybindings':
         return <KeybindingsSection />;
-      case 'server':
-        return <ServerSection />;
+      case 'remote':
+        return <RemoteControlSection />;
+      case 'account':
+        return <AccountSection />;
       case 'about':
         return <AboutSection />;
       default:

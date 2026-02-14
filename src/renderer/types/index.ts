@@ -163,10 +163,14 @@ export interface AuthAPI {
   logout: (token: string) => Promise<boolean>;
   validate: (token: string) => Promise<AuthResult>;
   updateProfile: (token: string, updates: Partial<Pick<User, 'username' | 'avatarUrl'>>) => Promise<AuthResult>;
+  changePassword: (token: string, oldPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
   getSettings: (token: string) => Promise<Record<string, unknown>>;
   setSettings: (token: string, key: string, value: unknown) => Promise<boolean>;
   getServerUrl: () => Promise<string>;
   getDefaultServerUrl: () => Promise<string>;
+  saveToken: (token: string) => Promise<boolean>;
+  loadToken: () => Promise<string | null>;
+  clearToken: () => Promise<boolean>;
 }
 
 export interface FileReadResult {
@@ -191,6 +195,7 @@ export interface WindowAPI {
   skills: SkillsAPI;
   commands: CommandsAPI;
   auth: AuthAPI;
+  remote: RemoteAPI;
 }
 
 export interface DependencyStatus {
@@ -320,10 +325,10 @@ export type SettingsTab =
   | 'skills'
   | 'commands'
   | 'mcp-servers'
-  | 'git'
   | 'appearance'
   | 'keybindings'
-  | 'server'
+  | 'remote'
+  | 'account'
   | 'about';
 
 export type ThemeMode = 'dark' | 'light' | 'system';
@@ -408,6 +413,12 @@ export interface KeyBinding {
   action: string;
 }
 
+export interface SecuritySettings {
+  lockPassword: string;          // 6-digit unlock password, default "666666"
+  allowRemoteControl: boolean;   // whether to allow mobile remote control
+  autoLockTimeout: number;       // ms delay before locking desktop after remote connect, 0=immediate
+}
+
 export interface ServerSettings {
   serverUrl: string;
 }
@@ -420,7 +431,80 @@ export interface AppSettings {
   git: GitSettings;
   appearance: AppearanceSettings;
   keybindings: KeyBinding[];
+  security: SecuritySettings;
   server: ServerSettings;
+}
+
+// ─── Remote control types ────────────────────────────────────────────
+
+export type ControlMode = 'local' | 'remote' | 'unlocking';
+
+export interface RemoteDesktopInfo {
+  desktopId: string;
+  deviceName: string;
+  online: boolean;
+  projectPath?: string;
+}
+
+export interface RemoteState {
+  // Connection
+  relayConnected: boolean;
+  pairingCode: string | null;
+  qrData: string | null;           // base64 QR data URL for display
+
+  // Paired devices
+  pairedDevices: PairedDevice[];
+
+  // Control state
+  controlMode: ControlMode;
+  controllingDeviceId: string | null;
+  controllingDeviceName: string | null;
+}
+
+export interface PairedDevice {
+  deviceId: string;
+  deviceName: string;
+  deviceType: 'mobile' | 'desktop';
+  pairedAt: number;
+  lastSeen?: number;
+}
+
+// ─── Remote protocol message types ──────────────────────────────────
+
+export interface RemoteCommand {
+  id: string;
+  channel: string;
+  args: unknown[];
+}
+
+export interface RemoteResponse {
+  id: string;
+  result?: unknown;
+  error?: string;
+}
+
+export interface RemoteEvent {
+  channel: string;
+  data: unknown;
+}
+
+// ─── Remote API (preload bridge) ────────────────────────────────────
+
+export interface RemoteAPI {
+  connect: (token: string) => Promise<boolean>;
+  disconnect: () => Promise<void>;
+  generatePairingQR: () => Promise<string | null>;   // returns QR data URL
+  revokePairing: (deviceId: string) => Promise<boolean>;
+  getPairedDevices: () => Promise<PairedDevice[]>;
+  unlock: (password: string) => Promise<boolean>;
+  getState: () => Promise<RemoteState>;
+  updateSettings: (settings: { lockPassword?: string; allowRemoteControl?: boolean; autoLockTimeout?: number }) => Promise<boolean>;
+
+  // Events
+  onStateChanged: (callback: (state: RemoteState) => void) => void;
+  removeStateChangedListener: (callback: (state: RemoteState) => void) => void;
+  onControlRequest: (callback: (deviceId: string, deviceName: string) => void) => void;
+  removeControlRequestListener: (callback: (deviceId: string, deviceName: string) => void) => void;
 }
 
 // ─── App state ──────────────────────────────────────────────────────

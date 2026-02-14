@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "Claude Studio",
+    "slug": "claude-studio-mobile",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "claude-studio",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.pagor.claude.studio.dev",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Camera is used to scan QR codes for pairing with desktop."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1a1a1a"
+      },
+      "package": "com.claudestudio.mobile",
+      "permissions": [
+        "CAMERA"
+      ]
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Claude Studio to access your camera for QR code scanning."
+        }
+      ],
+      "expo-asset"
+    ]
+  }
+}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { UserButton } from './UserButton';
+import { RemoteControlBanner } from '../Remote/RemoteIndicator';
 
 export function TopBar() {
   const { currentSession, currentProject, panels, togglePanel, platform, gitStatus } =
@@ -45,6 +46,8 @@ export function TopBar() {
             <span className="text-xs text-text-muted">Thinking…</span>
           </div>
         )}
+
+        <RemoteControlBanner />
       </div>
 
       {/* Right: action buttons + panel toggles */}

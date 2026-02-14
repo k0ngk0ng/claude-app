@@ -18,6 +18,24 @@ export interface ToolActivity {
   timestamp: number;
 }
 
+export interface PendingQuestionOption {
+  label: string;
+  description: string;
+}
+
+export interface PendingQuestionItem {
+  header: string;
+  question: string;
+  multiSelect: boolean;
+  options: PendingQuestionOption[];
+}
+
+export interface PendingQuestion {
+  toolId: string;
+  questions: PendingQuestionItem[];
+  answered: boolean;
+}
+
 // Per-session runtime state (preserved when switching threads)
 export interface SessionRuntime {
   processId: string | null;
@@ -46,6 +64,7 @@ interface AppStore {
   gitStatus: GitStatus | null;
   platform: 'mac' | 'windows' | 'linux';
   revealFile: string | null; // file path to reveal in FileTree
+  pendingQuestion: PendingQuestion | null;
 
   // Session actions
   setCurrentSession: (session: Partial<CurrentSession>) => void;
@@ -97,6 +116,10 @@ interface AppStore {
 
   // Reveal file in FileTree
   setRevealFile: (filePath: string | null) => void;
+
+  // AskUserQuestion
+  setPendingQuestion: (q: PendingQuestion | null) => void;
+  markQuestionAnswered: () => void;
 }
 
 const defaultSession: CurrentSession = {
@@ -134,6 +157,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   gitStatus: null,
   platform: 'mac',
   revealFile: null,
+  pendingQuestion: null,
 
   // Session actions
   setCurrentSession: (session) =>
@@ -146,6 +170,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       currentSession: { ...defaultSession },
       streamingContent: '',
       toolActivities: [],
+      pendingQuestion: null,
     }),
 
   clearMessages: () =>
@@ -156,6 +181,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       },
       streamingContent: '',
       toolActivities: [],
+      pendingQuestion: null,
     })),
 
   addMessage: (message) =>
@@ -241,7 +267,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         a.id === id ? { ...a, status } : a
       ),
     })),
-  clearToolActivities: () => set({ toolActivities: [] }),
+  clearToolActivities: () => set({ toolActivities: [], pendingQuestion: null }),
 
   // Session runtime save/restore
   saveCurrentRuntime: () => {
@@ -345,4 +371,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   // Reveal file
   setRevealFile: (filePath) => set({ revealFile: filePath }),
+
+  // AskUserQuestion
+  setPendingQuestion: (q) => set({ pendingQuestion: q }),
+  markQuestionAnswered: () =>
+    set((state) => ({
+      pendingQuestion: state.pendingQuestion
+        ? { ...state.pendingQuestion, answered: true }
+        : null,
+    })),
 }));

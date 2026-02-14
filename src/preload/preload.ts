@@ -115,10 +115,29 @@ export interface AuthAPI {
   logout: (token: string) => Promise<boolean>;
   validate: (token: string) => Promise<{ success: boolean; user?: unknown; token?: string; error?: string }>;
   updateProfile: (token: string, updates: { username?: string; avatarUrl?: string }) => Promise<{ success: boolean; user?: unknown; error?: string }>;
+  changePassword: (token: string, oldPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
   getSettings: (token: string) => Promise<Record<string, unknown>>;
   setSettings: (token: string, key: string, value: unknown) => Promise<boolean>;
   getServerUrl: () => Promise<string>;
   getDefaultServerUrl: () => Promise<string>;
+  saveToken: (token: string) => Promise<boolean>;
+  loadToken: () => Promise<string | null>;
+  clearToken: () => Promise<boolean>;
+}
+
+export interface RemoteAPI {
+  connect: (token: string) => Promise<boolean>;
+  disconnect: () => Promise<void>;
+  generatePairingQR: () => Promise<string | null>;
+  revokePairing: (deviceId: string) => Promise<boolean>;
+  getPairedDevices: () => Promise<unknown[]>;
+  unlock: (password: string) => Promise<boolean>;
+  getState: () => Promise<unknown>;
+  updateSettings: (settings: { lockPassword?: string; allowRemoteControl?: boolean; autoLockTimeout?: number }) => Promise<boolean>;
+  onStateChanged: (callback: (state: unknown) => void) => void;
+  removeStateChangedListener: (callback: (state: unknown) => void) => void;
+  onControlRequest: (callback: (deviceId: string, deviceName: string) => void) => void;
+  removeControlRequestListener: (callback: (deviceId: string, deviceName: string) => void) => void;
 }
 
 export interface AppAPI {
@@ -165,6 +184,8 @@ const terminalExitListeners = new Map<Function, (...args: any[]) => void>();
 const installProgressListeners = new Map<Function, (...args: any[]) => void>();
 const downloadProgressListeners = new Map<Function, (...args: any[]) => void>();
 const sessionsChangedListeners = new Map<Function, (...args: any[]) => void>();
+const remoteStateListeners = new Map<Function, (...args: any[]) => void>();
+const remoteControlRequestListeners = new Map<Function, (...args: any[]) => void>();
 
 contextBridge.exposeInMainWorld('api', {
   claude: {
@@ -404,6 +425,8 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('auth:validate', token),
     updateProfile: (token: string, updates: { username?: string; avatarUrl?: string }) =>
       ipcRenderer.invoke('auth:updateProfile', token, updates),
+    changePassword: (token: string, oldPassword: string, newPassword: string) =>
+      ipcRenderer.invoke('auth:changePassword', token, oldPassword, newPassword),
     getSettings: (token: string) =>
       ipcRenderer.invoke('auth:getSettings', token),
     setSettings: (token: string, key: string, value: unknown) =>
@@ -412,5 +435,62 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('auth:getServerUrl'),
     getDefaultServerUrl: () =>
       ipcRenderer.invoke('auth:getDefaultServerUrl'),
+    saveToken: (token: string) =>
+      ipcRenderer.invoke('auth:saveToken', token),
+    loadToken: () =>
+      ipcRenderer.invoke('auth:loadToken'),
+    clearToken: () =>
+      ipcRenderer.invoke('auth:clearToken'),
   } satisfies AuthAPI,
+
+  remote: {
+    connect: (token: string) =>
+      ipcRenderer.invoke('remote:connect', token),
+    disconnect: () =>
+      ipcRenderer.invoke('remote:disconnect'),
+    generatePairingQR: () =>
+      ipcRenderer.invoke('remote:generateQR'),
+    revokePairing: (deviceId: string) =>
+      ipcRenderer.invoke('remote:revokePairing', deviceId),
+    getPairedDevices: () =>
+      ipcRenderer.invoke('remote:getPairedDevices'),
+    unlock: (password: string) =>
+      ipcRenderer.invoke('remote:unlock', password),
+    getState: () =>
+      ipcRenderer.invoke('remote:getState'),
+    updateSettings: (settings: { lockPassword?: string; allowRemoteControl?: boolean; autoLockTimeout?: number }) =>
+      ipcRenderer.invoke('remote:updateSettings', settings),
+    onStateChanged: (callback: (state: unknown) => void) => {
+      const wrappedCallback = (_event: Electron.IpcRendererEvent, state: unknown) => {
+        callback(state);
+      };
+      remoteStateListeners.set(callback, wrappedCallback);
+      ipcRenderer.on('remote:state-changed', wrappedCallback);
+    },
+    removeStateChangedListener: (callback: (state: unknown) => void) => {
+      const wrappedCallback = remoteStateListeners.get(callback);
+      if (wrappedCallback) {
+        ipcRenderer.removeListener('remote:state-changed', wrappedCallback);
+        remoteStateListeners.delete(callback);
+      }
+    },
+    onControlRequest: (callback: (deviceId: string, deviceName: string) => void) => {
+      const wrappedCallback = (
+        _event: Electron.IpcRendererEvent,
+        deviceId: string,
+        deviceName: string,
+      ) => {
+        callback(deviceId, deviceName);
+      };
+      remoteControlRequestListeners.set(callback, wrappedCallback);
+      ipcRenderer.on('remote:control-request', wrappedCallback);
+    },
+    removeControlRequestListener: (callback: (deviceId: string, deviceName: string) => void) => {
+      const wrappedCallback = remoteControlRequestListeners.get(callback);
+      if (wrappedCallback) {
+        ipcRenderer.removeListener('remote:control-request', wrappedCallback);
+        remoteControlRequestListeners.delete(callback);
+      }
+    },
+  } satisfies RemoteAPI,
 });

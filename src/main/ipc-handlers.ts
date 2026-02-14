@@ -6,6 +6,7 @@ import { fileManager } from './file-manager';
 import { terminalManager } from './terminal-manager';
 import { getPlatform, getClaudeBinary, getClaudeModel, checkDependencies, readClaudeConfig, writeClaudeConfig } from './platform';
 import { registerAuthIpcHandlers } from './auth-ipc-handlers';
+import { registerRemoteIpcHandlers, registerExternalHandler } from './remote-ipc-handlers';
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
@@ -23,6 +24,13 @@ function getWebContents(): Electron.WebContents | null {
 }
 
 export function registerIpcHandlers(): void {
+  // Helper: register with ipcMain AND the remote handler registry
+  // so remote commands can invoke these handlers without internal API hacks.
+  function handle(channel: string, handler: (event: any, ...args: any[]) => any): void {
+    ipcMain.handle(channel, handler);
+    registerExternalHandler(channel, handler);
+  }
+
   // ─── Claude Process ───────────────────────────────────────────────
 
   // Register global listeners ONCE — forward all events to renderer
@@ -62,45 +70,45 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  ipcMain.handle('claude:spawn', async (_event, cwd: string, sessionId?: string, permissionMode?: string, envVars?: Array<{ key: string; value: string; enabled: boolean }>, language?: string) => {
+  handle('claude:spawn', async (_event, cwd: string, sessionId?: string, permissionMode?: string, envVars?: Array<{ key: string; value: string; enabled: boolean }>, language?: string) => {
     return claudeProcessManager.spawn(cwd, sessionId, permissionMode, envVars, language);
   });
 
-  ipcMain.handle('claude:send', (_event, processId: string, content: string) => {
+  handle('claude:send', (_event, processId: string, content: string) => {
     return claudeProcessManager.sendMessage(processId, content);
   });
 
-  ipcMain.handle('claude:kill', (_event, processId: string) => {
+  handle('claude:kill', (_event, processId: string) => {
     return claudeProcessManager.kill(processId);
   });
 
   // Permission response from renderer → forward to SDK canUseTool resolver
-  ipcMain.handle('claude:permission-response', (_event, processId: string, requestId: string, response: { behavior: 'allow' | 'deny'; updatedInput?: Record<string, unknown>; message?: string }) => {
+  handle('claude:permission-response', (_event, processId: string, requestId: string, response: { behavior: 'allow' | 'deny'; updatedInput?: Record<string, unknown>; message?: string }) => {
     return claudeProcessManager.respondToPermission(processId, requestId, response);
   });
 
   // Runtime permission mode change
-  ipcMain.handle('claude:setPermissionMode', async (_event, processId: string, mode: string) => {
+  handle('claude:setPermissionMode', async (_event, processId: string, mode: string) => {
     return claudeProcessManager.setPermissionMode(processId, mode);
   });
 
   // ─── Sessions ─────────────────────────────────────────────────────
-  ipcMain.handle('sessions:list', () => {
+  handle('sessions:list', () => {
     return sessionManager.getAllSessions();
   });
 
-  ipcMain.handle(
+  handle(
     'sessions:getMessages',
     (_event, projectPath: string, sessionId: string) => {
       return sessionManager.getSessionMessages(projectPath, sessionId);
     }
   );
 
-  ipcMain.handle('sessions:listProjects', () => {
+  handle('sessions:listProjects', () => {
     return sessionManager.listAllProjects();
   });
 
-  ipcMain.handle(
+  handle(
     'sessions:fork',
     (_event, projectPath: string, sessionId: string, cutoffUuid: string) => {
       return sessionManager.forkSession(projectPath, sessionId, cutoffUuid);
@@ -108,67 +116,67 @@ export function registerIpcHandlers(): void {
   );
 
   // ─── Git ──────────────────────────────────────────────────────────
-  ipcMain.handle('git:status', (_event, cwd: string) => {
+  handle('git:status', (_event, cwd: string) => {
     return gitManager.getStatus(cwd);
   });
 
-  ipcMain.handle(
+  handle(
     'git:diff',
     (_event, cwd: string, file?: string, staged?: boolean) => {
       return gitManager.getDiff(cwd, file, staged);
     }
   );
 
-  ipcMain.handle('git:stage', (_event, cwd: string, file: string) => {
+  handle('git:stage', (_event, cwd: string, file: string) => {
     return gitManager.stageFile(cwd, file);
   });
 
-  ipcMain.handle('git:unstage', (_event, cwd: string, file: string) => {
+  handle('git:unstage', (_event, cwd: string, file: string) => {
     return gitManager.unstageFile(cwd, file);
   });
 
-  ipcMain.handle('git:commit', (_event, cwd: string, message: string) => {
+  handle('git:commit', (_event, cwd: string, message: string) => {
     return gitManager.commit(cwd, message);
   });
 
-  ipcMain.handle('git:branch', (_event, cwd: string) => {
+  handle('git:branch', (_event, cwd: string) => {
     return gitManager.getCurrentBranch(cwd);
   });
 
-  ipcMain.handle('git:listBranches', (_event, cwd: string) => {
+  handle('git:listBranches', (_event, cwd: string) => {
     return gitManager.listBranches(cwd);
   });
 
-  ipcMain.handle('git:checkout', (_event, cwd: string, branch: string) => {
+  handle('git:checkout', (_event, cwd: string, branch: string) => {
     return gitManager.checkout(cwd, branch);
   });
 
-  ipcMain.handle('git:createBranch', (_event, cwd: string, branch: string) => {
+  handle('git:createBranch', (_event, cwd: string, branch: string) => {
     return gitManager.createAndCheckout(cwd, branch);
   });
 
-  ipcMain.handle('git:log', (_event, cwd: string, maxCount?: number) => {
+  handle('git:log', (_event, cwd: string, maxCount?: number) => {
     return gitManager.log(cwd, maxCount);
   });
 
-  ipcMain.handle('git:showCommitFiles', (_event, cwd: string, hash: string) => {
+  handle('git:showCommitFiles', (_event, cwd: string, hash: string) => {
     return gitManager.showCommitFiles(cwd, hash);
   });
 
-  ipcMain.handle('git:showCommitFileDiff', (_event, cwd: string, hash: string, file: string) => {
+  handle('git:showCommitFileDiff', (_event, cwd: string, hash: string, file: string) => {
     return gitManager.showCommitFileDiff(cwd, hash, file);
   });
 
-  ipcMain.handle('git:searchFiles', (_event, cwd: string, query: string) => {
+  handle('git:searchFiles', (_event, cwd: string, query: string) => {
     return fileManager.searchFiles(cwd, query);
   });
 
-  ipcMain.handle('git:listFiles', async (_event, cwd: string) => {
+  handle('git:listFiles', async (_event, cwd: string) => {
     return fileManager.listFiles(cwd);
   });
 
   // ─── Terminal ─────────────────────────────────────────────────────
-  ipcMain.handle('terminal:create', (_event, cwd: string) => {
+  handle('terminal:create', (_event, cwd: string) => {
     const id = terminalManager.create(cwd);
     if (!id) return null;
 
@@ -189,20 +197,20 @@ export function registerIpcHandlers(): void {
     return id;
   });
 
-  ipcMain.handle('terminal:write', (_event, id: string, data: string) => {
+  handle('terminal:write', (_event, id: string, data: string) => {
     return terminalManager.write(id, data);
   });
 
-  ipcMain.handle('terminal:resize', (_event, id: string, cols: number, rows: number) => {
+  handle('terminal:resize', (_event, id: string, cols: number, rows: number) => {
     return terminalManager.resize(id, cols, rows);
   });
 
-  ipcMain.handle('terminal:kill', (_event, id: string) => {
+  handle('terminal:kill', (_event, id: string) => {
     return terminalManager.kill(id);
   });
 
   // ─── File ─────────────────────────────────────────────────────────
-  ipcMain.handle('file:read', (_event, filePath: string, maxSize?: number) => {
+  handle('file:read', (_event, filePath: string, maxSize?: number) => {
     const limit = maxSize || 1024 * 512; // 512KB default
     try {
       const stat = fs.statSync(filePath);
@@ -226,11 +234,11 @@ export function registerIpcHandlers(): void {
   });
 
   // ─── App ──────────────────────────────────────────────────────────
-  ipcMain.handle('app:getProjectPath', () => {
+  handle('app:getProjectPath', () => {
     return os.homedir();
   });
 
-  ipcMain.handle('app:selectDirectory', async () => {
+  handle('app:selectDirectory', async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory'],
       title: 'Select Project Directory',
@@ -241,20 +249,20 @@ export function registerIpcHandlers(): void {
     return result.filePaths[0];
   });
 
-  ipcMain.handle('app:getPlatform', () => {
+  handle('app:getPlatform', () => {
     return getPlatform();
   });
 
-  ipcMain.handle('app:getHomePath', () => {
+  handle('app:getHomePath', () => {
     return os.homedir();
   });
 
-  ipcMain.handle('app:getVersion', () => {
+  handle('app:getVersion', () => {
     const { app } = require('electron');
     return app.getVersion();
   });
 
-  ipcMain.handle('app:getAgentSdkVersion', () => {
+  handle('app:getAgentSdkVersion', () => {
     try {
       const sdkPkgPath = require.resolve('@anthropic-ai/claude-agent-sdk/package.json');
       const sdkPkg = JSON.parse(fs.readFileSync(sdkPkgPath, 'utf-8'));
@@ -264,7 +272,7 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  ipcMain.handle('app:getClaudeCodeVersion', () => {
+  handle('app:getClaudeCodeVersion', () => {
     // Try 1: run `claude --version` from the global CLI
     try {
       const claudePath = getClaudeBinary();
@@ -298,7 +306,7 @@ export function registerIpcHandlers(): void {
     return 'not found';
   });
 
-  ipcMain.handle('app:getGitVersion', () => {
+  handle('app:getGitVersion', () => {
     try {
       const raw = execSync('git --version', {
         encoding: 'utf-8',
@@ -313,7 +321,7 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  ipcMain.handle('app:installClaudeCode', async () => {
+  handle('app:installClaudeCode', async () => {
     const platform = getPlatform();
     const wc = getWebContents();
     try {
@@ -342,7 +350,7 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  ipcMain.handle('app:installGit', async () => {
+  handle('app:installGit', async () => {
     const platform = getPlatform();
     try {
       if (platform === 'mac') {
@@ -391,7 +399,7 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  ipcMain.handle('app:checkForUpdates', async () => {
+  handle('app:checkForUpdates', async () => {
     try {
       const https = require('https');
       const data: string = await new Promise((resolve, reject) => {
@@ -447,7 +455,7 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  ipcMain.handle('app:downloadUpdate', async (_event, downloadUrl: string, fileName: string) => {
+  handle('app:downloadUpdate', async (_event, downloadUrl: string, fileName: string) => {
     const https = require('https');
     const downloadDir = path.join(os.homedir(), 'Downloads');
     const filePath = path.join(downloadDir, fileName);
@@ -537,7 +545,7 @@ export function registerIpcHandlers(): void {
     });
   });
 
-  ipcMain.handle('app:installUpdate', async (_event, filePath: string) => {
+  handle('app:installUpdate', async (_event, filePath: string) => {
     try {
       const platform = getPlatform();
       if (platform === 'mac') {
@@ -558,15 +566,15 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  ipcMain.handle('app:getModel', () => {
+  handle('app:getModel', () => {
     return getClaudeModel();
   });
 
-  ipcMain.handle('app:checkDependencies', () => {
+  handle('app:checkDependencies', () => {
     return checkDependencies();
   });
 
-  ipcMain.handle('app:openInEditor', async (_event, cwd: string, editor: string) => {
+  handle('app:openInEditor', async (_event, cwd: string, editor: string) => {
     try {
       const platform = getPlatform();
       // On Windows, CLI tools like 'code', 'cursor' etc. are .cmd/.bat scripts
@@ -636,7 +644,7 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  ipcMain.handle('app:getAvailableEditors', async () => {
+  handle('app:getAvailableEditors', async () => {
     const platform = getPlatform();
     const editors: { id: string; name: string; icon?: string }[] = [];
 
@@ -766,7 +774,7 @@ export function registerIpcHandlers(): void {
   });
 
   // ─── Bootstrap: check & install runtime dependencies ─────────────
-  ipcMain.handle('app:checkRuntimeDeps', async () => {
+  handle('app:checkRuntimeDeps', async () => {
     // In packaged app, deps are bundled by forge hook — always report found
     if (app.isPackaged) {
       return [
@@ -795,7 +803,7 @@ export function registerIpcHandlers(): void {
     return results;
   });
 
-  ipcMain.handle('app:installRuntimeDeps', async () => {
+  handle('app:installRuntimeDeps', async () => {
     // Determine where to install — use app's user data directory for production
     const isPackaged = app.isPackaged;
     let installDir: string;
@@ -889,11 +897,11 @@ export function registerIpcHandlers(): void {
   });
 
   // ─── Claude Code config (~/.claude/settings.json) ─────────────────
-  ipcMain.handle('claudeConfig:read', () => {
+  handle('claudeConfig:read', () => {
     return readClaudeConfig();
   });
 
-  ipcMain.handle('claudeConfig:write', (_event, updates: Record<string, unknown>) => {
+  handle('claudeConfig:write', (_event, updates: Record<string, unknown>) => {
     writeClaudeConfig(updates);
     return true;
   });
@@ -917,7 +925,7 @@ export function registerIpcHandlers(): void {
     }
   }
 
-  ipcMain.handle('settings:read', async () => {
+  handle('settings:read', async () => {
     try {
       if (!fs.existsSync(settingsFile)) {
         return null;
@@ -929,7 +937,7 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  ipcMain.handle('settings:write', async (_event, data: Record<string, unknown>) => {
+  handle('settings:write', async (_event, data: Record<string, unknown>) => {
     try {
       if (!fs.existsSync(settingsDir)) {
         fs.mkdirSync(settingsDir, { recursive: true });
@@ -942,16 +950,16 @@ export function registerIpcHandlers(): void {
   });
 
   // ─── Git push ─────────────────────────────────────────────────────
-  ipcMain.handle('git:push', async (_event, cwd: string) => {
+  handle('git:push', async (_event, cwd: string) => {
     return gitManager.push(cwd);
   });
 
-  ipcMain.handle('git:pushTags', async (_event, cwd: string) => {
+  handle('git:pushTags', async (_event, cwd: string) => {
     return gitManager.pushTags(cwd);
   });
 
   // ─── File operations ─────────────────────────────────────────────
-  ipcMain.handle('app:showItemInFolder', (_event, fullPath: string) => {
+  handle('app:showItemInFolder', (_event, fullPath: string) => {
     try {
       // showItemInFolder works for files; for directories, open the directory itself
       const stat = fs.statSync(fullPath);
@@ -967,7 +975,7 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  ipcMain.handle('app:openFile', async (_event, fullPath: string) => {
+  handle('app:openFile', async (_event, fullPath: string) => {
     try {
       const result = await shell.openPath(fullPath);
       // shell.openPath returns empty string on success, error message on failure
@@ -982,7 +990,7 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  ipcMain.handle('app:openExternal', async (_event, url: string) => {
+  handle('app:openExternal', async (_event, url: string) => {
     try {
       await shell.openExternal(url);
       return true;
@@ -994,7 +1002,7 @@ export function registerIpcHandlers(): void {
   // ─── Skills (~/.claude/skills/) ─────────────────────────────────────
   const globalSkillsDir = path.join(os.homedir(), '.claude', 'skills');
 
-  ipcMain.handle('skills:list', async () => {
+  handle('skills:list', async () => {
     const skills: {
       name: string; description: string; content: string;
       dirPath: string; filePath: string; hasTemplate: boolean; hasReferences: boolean;
@@ -1054,11 +1062,11 @@ export function registerIpcHandlers(): void {
     return skills;
   });
 
-  ipcMain.handle('skills:read', async (_event, filePath: string) => {
+  handle('skills:read', async (_event, filePath: string) => {
     return fs.readFileSync(filePath, 'utf-8');
   });
 
-  ipcMain.handle('skills:create', async (_event, name: string, content: string) => {
+  handle('skills:create', async (_event, name: string, content: string) => {
     try {
       const dirPath = path.join(globalSkillsDir, name);
       if (!fs.existsSync(dirPath)) {
@@ -1072,7 +1080,7 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  ipcMain.handle('skills:update', async (_event, filePath: string, content: string) => {
+  handle('skills:update', async (_event, filePath: string, content: string) => {
     try {
       fs.writeFileSync(filePath, content, 'utf-8');
       return true;
@@ -1082,7 +1090,7 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  ipcMain.handle('skills:remove', async (_event, dirPath: string) => {
+  handle('skills:remove', async (_event, dirPath: string) => {
     try {
       // Check if it's a symlink — just remove the link
       const lstat = fs.lstatSync(dirPath);
@@ -1138,7 +1146,7 @@ export function registerIpcHandlers(): void {
     return { name, fileName, type: ext, description, argumentHint, content, filePath };
   }
 
-  ipcMain.handle('commands:list', async () => {
+  handle('commands:list', async () => {
     const commands: ReturnType<typeof parseCommandFile>[] = [];
 
     if (!fs.existsSync(globalCommandsDir)) return commands;
@@ -1162,11 +1170,11 @@ export function registerIpcHandlers(): void {
     return commands;
   });
 
-  ipcMain.handle('commands:read', async (_event, filePath: string) => {
+  handle('commands:read', async (_event, filePath: string) => {
     return fs.readFileSync(filePath, 'utf-8');
   });
 
-  ipcMain.handle('commands:create', async (_event, fileName: string, content: string) => {
+  handle('commands:create', async (_event, fileName: string, content: string) => {
     try {
       if (!fs.existsSync(globalCommandsDir)) {
         fs.mkdirSync(globalCommandsDir, { recursive: true });
@@ -1183,7 +1191,7 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  ipcMain.handle('commands:update', async (_event, filePath: string, content: string) => {
+  handle('commands:update', async (_event, filePath: string, content: string) => {
     try {
       fs.writeFileSync(filePath, content, 'utf-8');
       return true;
@@ -1193,7 +1201,7 @@ export function registerIpcHandlers(): void {
     }
   });
 
-  ipcMain.handle('commands:remove', async (_event, filePath: string) => {
+  handle('commands:remove', async (_event, filePath: string) => {
     try {
       fs.unlinkSync(filePath);
       return true;
@@ -1205,6 +1213,9 @@ export function registerIpcHandlers(): void {
 
   // ─── Auth ────────────────────────────────────────────────────────
   registerAuthIpcHandlers();
+
+  // ─── Remote Control ─────────────────────────────────────────────
+  registerRemoteIpcHandlers();
 
   // ─── Auto-watch sessions directory for changes ────────────────────
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;

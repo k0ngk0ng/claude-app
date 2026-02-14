@@ -8,7 +8,7 @@ import fs from 'fs';
 import { execSync } from 'child_process';
 
 // Externalized native/ESM modules that must be copied into the packaged app
-const EXTERNAL_MODULES = ['@anthropic-ai/claude-agent-sdk'];
+const EXTERNAL_MODULES = ['@anthropic-ai/claude-agent-sdk', 'ws'];
 
 // node-pty directories/files to SKIP when copying (avoids electron-rebuild trigger)
 // NOTE: We keep 'build' because it contains the Electron-rebuilt pty.node

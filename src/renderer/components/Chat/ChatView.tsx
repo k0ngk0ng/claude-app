@@ -7,6 +7,7 @@ import { useSessions } from '../../hooks/useSessions';
 import { MessageBubble } from './MessageBubble';
 import { ToolCard } from './ToolCard';
 import { PermissionPrompt } from './PermissionPrompt';
+import { AskUserQuestionCard } from './AskUserQuestionCard';
 import { WelcomeScreen } from './WelcomeScreen';
 import { ChatSearch } from './ChatSearch';
 import type { AppearanceSettings } from '../../types';
@@ -31,7 +32,7 @@ function getLayoutClass(layout: AppearanceSettings['chatLayout']): string {
 export let chatScrollElement: HTMLDivElement | null = null;
 
 export function ChatView() {
-  const { currentSession, streamingContent, toolActivities, isLoadingSession } = useAppStore();
+  const { currentSession, streamingContent, toolActivities, isLoadingSession, pendingQuestion } = useAppStore();
   const { settings } = useSettingsStore();
   const { pendingRequests } = usePermissionStore();
   const { forkSession } = useSessions();
@@ -258,6 +259,19 @@ export function ChatView() {
               <span className="text-sm text-text-muted">Claude is thinking…</span>
             </div>
           </div>
+        )}
+
+        {/* AskUserQuestion interactive card */}
+        {pendingQuestion && !pendingQuestion.answered && (
+          <AskUserQuestionCard
+            questions={pendingQuestion.questions}
+            onSubmit={(answer) => {
+              useAppStore.getState().markQuestionAnswered();
+              window.dispatchEvent(
+                new CustomEvent('claude:user-answer', { detail: answer })
+              );
+            }}
+          />
         )}
 
         {/* Permission prompts */}
